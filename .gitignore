@@ -1,0 +1,11 @@
+/bin/
+/dist/
+/web/dist/
+/web/node_modules/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+.env
+.env.*
+!.env.example
