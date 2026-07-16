@@ -57,15 +57,21 @@ See [`docs/adapter-authoring.md`](docs/adapter-authoring.md) and the working [`s
 
 ## Install
 
-Release archives contain one native binary and require no language runtime. After the first tagged release, install the latest verified archive with:
+Release archives contain one native binary and require no language runtime. Install the latest verified archive with:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/unlatch-ai/rolloutviz/main/scripts/install.sh | sh
 ```
 
-Set `ROLLOUTVIZ_VERSION` to pin a release and `ROLLOUTVIZ_INSTALL_DIR` to choose the destination. The installer verifies the release checksum before installing both `rlviz` and the `rolloutviz` alias. Homebrew packaging is planned alongside the first public release.
+Set `ROLLOUTVIZ_VERSION` to pin a release and `ROLLOUTVIZ_INSTALL_DIR` to choose the destination. The installer verifies the release checksum before installing both `rlviz` and the `rolloutviz` alias.
 
-For Node-based environments and coding-agent sandboxes, the same native binary is available through the `rolloutviz` npm package:
+On macOS or Linux with Homebrew:
+
+```bash
+brew install unlatch-ai/tap/rolloutviz
+```
+
+For Node-based environments and coding-agent sandboxes, the same native binary is packaged for npm. npm publication is being bootstrapped; until it is live, use Homebrew or the verified curl installer above.
 
 ```bash
 npm install --global rolloutviz

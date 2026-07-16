@@ -4,7 +4,7 @@ The implementation is organized as vertical milestones. Each milestone should le
 
 ## Current delivery
 
-Milestones 0–6 are implemented in the repository: versioned contracts and fixtures, the single-trajectory viewer, authenticated daemon lifecycle, progressive SQLite indexing, paginated and virtualized event reads, growing-file updates, trusted external adapters and analyzers, rollout-group summaries, compact behavioral paths, deterministic long-trace comparison, and cached loop/retry findings. Milestone 7 release automation and installers are implemented; publishing the first public tag, Homebrew tap, and npm package is the remaining release step.
+Milestones 0–7 are implemented in the repository: versioned contracts and fixtures, the single-trajectory viewer, authenticated daemon lifecycle, progressive SQLite indexing, paginated and virtualized reads, growing-file updates, trusted external adapters and analyzers, rollout-group summaries, compact behavioral paths, deterministic long-trace comparison, cached loop/retry findings, release automation, and verified installers. `v0.1.0` is published with native macOS/Linux archives, checksums, attestations, a curl installer, and the `unlatch-ai/tap/rolloutviz` Homebrew formula. Initial npm publication remains an account-level bootstrap step.
 
 ## Milestone 0: contracts and fixtures
 
@@ -162,11 +162,11 @@ Milestones 0–6 are implemented in the repository: versioned contracts and fixt
 
 ## Near-term issue sequence
 
-1. Publish `v0.1.0` native archives, checksums, attestations, and formula.
-2. Create the Homebrew tap and bootstrap the npm package/trusted publisher.
-3. Validate the clean-machine install-to-open path on macOS and Linux.
+1. Bootstrap the npm package, configure its trusted publisher, and enable automated npm releases.
+2. Add a narrow tap-update token so future tags update Homebrew automatically.
+3. Validate the clean-machine install-to-open path on Linux; macOS curl and Homebrew paths are verified.
 4. Gather real adapter fixtures from environment and post-training workflows.
-5. Profile larger rollout groups and add cursors where bounded child collections are currently truncated.
+5. Profile larger rollout groups and tune the existing event, signal, and artifact cursors.
 6. Extend comparison sets across sources, runs, and checkpoints after the local single-source workflow is proven.
 
 ## Quality gates
