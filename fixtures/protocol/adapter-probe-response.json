@@ -1,0 +1,6 @@
+{
+  "supported": true,
+  "confidence": 0.95,
+  "format": "example-jsonl-v2",
+  "reason": "recognized header and event fields"
+}

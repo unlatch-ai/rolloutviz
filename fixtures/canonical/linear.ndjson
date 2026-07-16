@@ -1,0 +1,11 @@
+{"record_type":"run","id":"run-linear","name":"linear example","started_at":"2026-01-15T12:00:00Z","metadata":{"model":"example-agent"}}
+{"record_type":"case","id":"case-file","run_id":"run-linear","name":"write greeting","input":{"prompt":"Write hello.txt"}}
+{"record_type":"group","id":"group-file","case_id":"case-file","metadata":{"samples":1}}
+{"record_type":"trajectory","id":"traj-linear","group_id":"group-file","status":"completed","termination":"success"}
+{"record_type":"event","id":"evt-user","trajectory_id":"traj-linear","sequence":0,"kind":"message","input":{"role":"user","content":"Write hello.txt"},"source":{"path":"source/linear.jsonl","line":1,"byte_offset":0,"byte_length":72},"raw":{"role":"user","content":"Write hello.txt"}}
+{"record_type":"event","id":"evt-tool","trajectory_id":"traj-linear","sequence":10,"kind":"tool","parent_id":"evt-user","alignment_key":"write_file:hello.txt","input":{"name":"write_file","arguments":{"path":"hello.txt","content":"hello\n"}},"output":{"ok":true},"source":{"path":"source/linear.jsonl","line":2,"byte_offset":73,"byte_length":144}}
+{"record_type":"event","id":"evt-reward","trajectory_id":"traj-linear","sequence":20,"kind":"reward","parent_id":"evt-tool","data":{"reward":1}}
+{"record_type":"signal","id":"sig-pass","trajectory_id":"traj-linear","event_id":"evt-reward","name":"pass","value":true}
+{"record_type":"signal","id":"sig-reward","trajectory_id":"traj-linear","name":"reward","value":1,"unit":"points"}
+{"record_type":"artifact","id":"artifact-file","trajectory_id":"traj-linear","event_id":"evt-tool","name":"hello.txt","media_type":"text/plain","text":"hello\n","sha256":"5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"}
+{"record_type":"complete","records":10,"warnings":0}

@@ -1,0 +1,6 @@
+{"record_type":"run","id":"run-bad-parent"}
+{"record_type":"case","id":"case-bad-parent","run_id":"run-bad-parent"}
+{"record_type":"group","id":"group-bad-parent","case_id":"case-bad-parent"}
+{"record_type":"trajectory","id":"traj-bad-parent","group_id":"group-bad-parent"}
+{"record_type":"event","id":"evt-orphan","trajectory_id":"traj-bad-parent","sequence":0,"kind":"tool","parent_id":"evt-missing"}
+{"record_type":"complete","records":5,"warnings":0}

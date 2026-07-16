@@ -25,7 +25,7 @@ The implementation is organized as vertical milestones. Each milestone should le
 
 ### Deliverables
 
-- `rolloutviz open`
+- `rlviz open`
 - Foreground local server
 - Built-in canonical JSONL adapter
 - Embedded React UI
@@ -57,7 +57,7 @@ The implementation is organized as vertical milestones. Each milestone should le
 
 ### Exit criteria
 
-- `rolloutviz open` returns without holding the invoking shell.
+- `rlviz open` returns without holding the invoking shell.
 - A 10,000-event trajectory scrolls smoothly.
 - Large files reach first render before full indexing completes.
 - Appended records appear without reopening the viewer.

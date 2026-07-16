@@ -104,7 +104,7 @@ These fields enrich comparison but are not required for single-trajectory viewin
 ## Validation
 
 ```bash
-rolloutviz plugin validate ./plugins/customer-x ./fixtures/sample.jsonl
+rlviz plugin validate ./plugins/customer-x ./fixtures/sample.jsonl
 ```
 
 Validation checks:

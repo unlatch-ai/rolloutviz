@@ -1,7 +1,8 @@
 /bin/
 /dist/
-/web/dist/
 /web/node_modules/
+/web/*.tsbuildinfo
+/web/src/*.tsbuildinfo
 *.db
 *.db-shm
 *.db-wal

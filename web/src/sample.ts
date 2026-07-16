@@ -1,0 +1,83 @@
+import type { Trajectory } from "./types";
+
+export const sampleTrajectory: Trajectory = {
+  id: "traj-checkout-017",
+  name: "checkout_agent / case_184",
+  run_id: "checkpoint-1200-eval",
+  case_id: "task-184",
+  group_id: "grpo-184-02",
+  model: "policy-checkpoint-1200",
+  status: "failed",
+  started_at: "2026-07-16T18:42:10.012Z",
+  duration_ms: 12843,
+  total_reward: 0.25,
+  metadata: { environment: "checkout-v4", seed: 88421, sampling_temperature: 0.7 },
+  events: [
+    {
+      id: "evt-001", sequence: 1, kind: "message", title: "Task prompt",
+      summary: "Update the delivery address, then submit the order.",
+      content: "Change the delivery address for order #1842 to 548 Market Street, San Francisco, then submit the order.",
+      timestamp: "2026-07-16T18:42:10.012Z", token_count: 31,
+      source: { path: "artifacts/task-184.jsonl", line: 1, byte_start: 0, byte_end: 318 },
+    },
+    {
+      id: "evt-002", sequence: 2, kind: "generation", title: "Assistant reasoning",
+      summary: "Plans to inspect the order before modifying it.",
+      content: "I need to look up the order, confirm its current status, and then update the shipping address before submission.",
+      timestamp: "2026-07-16T18:42:10.740Z", duration_ms: 728, token_count: 52,
+    },
+    {
+      id: "evt-003", sequence: 3, kind: "tool", title: "get_order",
+      summary: "Fetch order 1842",
+      input: { order_id: "1842", include: ["items", "shipping", "status"] },
+      output: { status: "draft", shipping_address: "221 Pine St, San Francisco", items: 3 },
+      timestamp: "2026-07-16T18:42:11.052Z", duration_ms: 184, alignment_key: "tool:get_order",
+    },
+    {
+      id: "evt-004", sequence: 4, kind: "observation", title: "Order loaded",
+      summary: "Draft order with 3 items; address can be changed.",
+      content: { order_id: "1842", state: "draft", can_edit_shipping: true },
+      timestamp: "2026-07-16T18:42:11.238Z", state_hash: "sha256:4b339b8e",
+    },
+    {
+      id: "evt-005", sequence: 5, kind: "tool", title: "update_shipping_address",
+      summary: "Set address to 548 Market Street",
+      input: { order_id: "1842", address: { line1: "548 Market Street", city: "San Francisco", region: "CA" } },
+      output: { ok: true, normalized: "548 Market St, San Francisco, CA" },
+      timestamp: "2026-07-16T18:42:12.444Z", duration_ms: 231, alignment_key: "tool:update_shipping",
+    },
+    {
+      id: "evt-006", sequence: 6, kind: "reward", title: "Address update reward",
+      summary: "Correct address mutation",
+      reward: 0.5, content: { component: "address_correct", value: 0.5, max: 0.5 },
+      timestamp: "2026-07-16T18:42:12.679Z",
+    },
+    {
+      id: "evt-007", sequence: 7, kind: "generation", title: "Assistant reasoning",
+      summary: "Attempts to submit without re-fetching order state.",
+      content: "The address update succeeded. I can now submit the order directly.",
+      timestamp: "2026-07-16T18:42:13.201Z", duration_ms: 522, token_count: 29,
+    },
+    {
+      id: "evt-008", sequence: 8, kind: "tool", title: "submit_order",
+      summary: "Submit order 1842",
+      input: { order_id: "1842", confirmation_token: "draft-token-91a" },
+      output: { ok: false, code: "STALE_CONFIRMATION", message: "Order changed after confirmation token was issued" },
+      timestamp: "2026-07-16T18:42:13.724Z", duration_ms: 315, alignment_key: "tool:submit_order",
+    },
+    {
+      id: "evt-009", sequence: 9, kind: "error", title: "Stale confirmation token",
+      summary: "submit_order rejected a token issued before the address mutation.",
+      content: { code: "STALE_CONFIRMATION", retryable: true, expected_action: "refresh_order" },
+      timestamp: "2026-07-16T18:42:14.041Z",
+      source: { path: "artifacts/task-184.jsonl", line: 9, byte_start: 3188, byte_end: 3642 },
+    },
+    {
+      id: "evt-010", sequence: 10, kind: "grader", title: "Task completion grader",
+      summary: "Address changed, but order was not submitted.",
+      reward: -0.25,
+      content: { label: "partial", passed: false, components: { address_updated: 1, order_submitted: 0 }, feedback: "Refresh order state after mutations before submission." },
+      timestamp: "2026-07-16T18:42:22.855Z", duration_ms: 8814,
+    },
+  ],
+};

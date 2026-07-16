@@ -70,10 +70,10 @@ docs/                  product and engineering documentation
 
 ## Daemon lifecycle
 
-`rolloutviz open` must return promptly when invoked by a coding agent.
+`rlviz open` must return promptly when invoked by a coding agent.
 
 ```text
-rolloutviz open PATH
+rlviz open PATH
   -> read daemon metadata
   -> start a detached daemon when absent
   -> authenticate to the loopback daemon with a local token
@@ -86,10 +86,10 @@ rolloutviz open PATH
 Development and troubleshooting commands:
 
 ```bash
-rolloutviz serve --foreground
-rolloutviz status
-rolloutviz stop
-rolloutviz doctor
+rlviz serve --foreground
+rlviz status
+rlviz stop
+rlviz doctor
 ```
 
 ## Canonical data model

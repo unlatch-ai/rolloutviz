@@ -6,7 +6,7 @@
 | --- | --- |
 | Name | RolloutViz |
 | npm package | `rolloutviz` |
-| CLI | `rolloutviz` |
+| CLI | `rlviz` (`rolloutviz` compatibility alias) |
 | Tagline | Visualize and compare agent rollouts. |
 
 ## Problem
@@ -104,7 +104,7 @@ brew install <tap>/rolloutviz
 ### Open a supported trajectory
 
 ```bash
-rolloutviz open ./artifacts/task-184.jsonl
+rlviz open ./artifacts/task-184.jsonl
 ```
 
 Expected behavior:
@@ -124,16 +124,16 @@ The CLI returns a machine-readable diagnostic and scaffold command:
 {
   "code": "unsupported_format",
   "path": "/absolute/path/trajectory.jsonl",
-  "suggested_command": "rolloutviz plugin init --type adapter /absolute/path/trajectory.jsonl"
+  "suggested_command": "rlviz plugin init --type adapter /absolute/path/trajectory.jsonl"
 }
 ```
 
 A coding agent can then create, validate, and use a local adapter:
 
 ```bash
-rolloutviz plugin init --type adapter --lang python ./trajectory.jsonl
-rolloutviz plugin validate ./plugins/customer-x ./trajectory.jsonl
-rolloutviz open ./trajectory.jsonl --adapter ./plugins/customer-x
+rlviz plugin init --type adapter --lang python ./trajectory.jsonl
+rlviz plugin validate ./plugins/customer-x ./trajectory.jsonl
+rlviz open ./trajectory.jsonl --adapter ./plugins/customer-x
 ```
 
 ## Single-trajectory viewer

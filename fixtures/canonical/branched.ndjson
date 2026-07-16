@@ -1,0 +1,10 @@
+{"record_type":"run","id":"run-branch"}
+{"record_type":"case","id":"case-branch","run_id":"run-branch"}
+{"record_type":"group","id":"group-branch","case_id":"case-branch"}
+{"record_type":"trajectory","id":"traj-root","group_id":"group-branch","branch_id":"root","status":"completed"}
+{"record_type":"trajectory","id":"traj-child","group_id":"group-branch","parent_id":"traj-root","branch_id":"retry-1","status":"completed"}
+{"record_type":"event","id":"evt-root-action","trajectory_id":"traj-root","sequence":0,"kind":"environment_action","branch_id":"root","alignment_key":"click:submit","input":{"target":"submit"},"state_hash":"before-submit"}
+{"record_type":"event","id":"evt-root-state","trajectory_id":"traj-root","sequence":1,"kind":"state","parent_id":"evt-root-action","branch_id":"root","state_hash":"submitted","data":{"page":"done"}}
+{"record_type":"event","id":"evt-child-action","trajectory_id":"traj-child","sequence":0,"kind":"environment_action","branch_id":"retry-1","alignment_key":"click:cancel","input":{"target":"cancel"},"state_hash":"before-submit"}
+{"record_type":"event","id":"evt-child-state","trajectory_id":"traj-child","sequence":1,"kind":"state","parent_id":"evt-child-action","branch_id":"retry-1","state_hash":"cancelled","data":{"page":"cancelled"}}
+{"record_type":"complete","records":9,"warnings":0}

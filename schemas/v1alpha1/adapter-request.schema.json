@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rolloutviz.dev/schemas/v1alpha1/adapter-request.schema.json",
+  "title": "RolloutViz adapter operation request",
+  "type": "object",
+  "required": ["api_version", "operation", "source"],
+  "properties": {
+    "api_version": { "const": "rolloutviz.dev/v1alpha1" },
+    "operation": { "enum": ["probe", "stream"] },
+    "source": {
+      "type": "object",
+      "required": ["path", "root"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "root": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["file", "directory"] },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "modified_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "options": { "type": "object" },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "probe_bytes": { "type": "integer", "minimum": 1 },
+        "timeout_ms": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

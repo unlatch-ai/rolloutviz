@@ -1,0 +1,7 @@
+{"record_type":"run","id":"run-order"}
+{"record_type":"case","id":"case-order","run_id":"run-order"}
+{"record_type":"group","id":"group-order","case_id":"case-order"}
+{"record_type":"trajectory","id":"traj-order","group_id":"group-order"}
+{"record_type":"event","id":"evt-later","trajectory_id":"traj-order","sequence":10,"kind":"log"}
+{"record_type":"event","id":"evt-earlier","trajectory_id":"traj-order","sequence":9,"kind":"log"}
+{"record_type":"complete","records":6,"warnings":0}

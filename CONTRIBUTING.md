@@ -9,11 +9,12 @@ Before starting a larger change, open an issue describing the user workflow and 
 Requirements:
 
 - Go 1.24 or newer
-- Node.js 22 or newer once the web workspace lands
+- Node.js 22 or newer
 
 Run the local checks:
 
 ```bash
+make web-install
 make check
 make build
 ```

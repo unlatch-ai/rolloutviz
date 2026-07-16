@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rolloutviz.dev/schemas/v1alpha1/canonical-record.schema.json",
+  "title": "RolloutViz canonical NDJSON record",
+  "description": "One line in a rolloutviz.dev/v1alpha1 canonical stream. References must point to records emitted earlier in the same stream; event sequence values must strictly increase per trajectory; complete must be last and its records count excludes itself.",
+  "oneOf": [
+    { "$ref": "#/$defs/run" },
+    { "$ref": "#/$defs/case" },
+    { "$ref": "#/$defs/group" },
+    { "$ref": "#/$defs/trajectory" },
+    { "$ref": "#/$defs/event" },
+    { "$ref": "#/$defs/signal" },
+    { "$ref": "#/$defs/artifact" },
+    { "$ref": "#/$defs/complete" }
+  ],
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "metadata": { "type": "object" },
+    "run": {
+      "type": "object",
+      "required": ["record_type", "id"],
+      "properties": {
+        "record_type": { "const": "run" },
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      },
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "required": ["record_type", "id", "run_id"],
+      "properties": {
+        "record_type": { "const": "case" },
+        "id": { "$ref": "#/$defs/id" },
+        "run_id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "input": {},
+        "metadata": { "$ref": "#/$defs/metadata" }
+      },
+      "additionalProperties": false
+    },
+    "group": {
+      "type": "object",
+      "required": ["record_type", "id", "case_id"],
+      "properties": {
+        "record_type": { "const": "group" },
+        "id": { "$ref": "#/$defs/id" },
+        "case_id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      },
+      "additionalProperties": false
+    },
+    "trajectory": {
+      "type": "object",
+      "required": ["record_type", "id", "group_id"],
+      "properties": {
+        "record_type": { "const": "trajectory" },
+        "id": { "$ref": "#/$defs/id" },
+        "group_id": { "$ref": "#/$defs/id" },
+        "parent_id": { "$ref": "#/$defs/id" },
+        "branch_id": { "$ref": "#/$defs/id" },
+        "status": { "enum": ["running", "completed", "failed", "cancelled"] },
+        "termination": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      },
+      "additionalProperties": false
+    },
+    "source_location": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 0 },
+        "byte_offset": { "type": "integer", "minimum": 0 },
+        "byte_length": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["record_type", "id", "trajectory_id", "sequence", "kind"],
+      "properties": {
+        "record_type": { "const": "event" },
+        "id": { "$ref": "#/$defs/id" },
+        "trajectory_id": { "$ref": "#/$defs/id" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "kind": { "enum": ["message", "generation", "tool", "environment_action", "observation", "state", "reward", "grader", "artifact", "error", "log"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "parent_id": { "$ref": "#/$defs/id" },
+        "branch_id": { "$ref": "#/$defs/id" },
+        "alignment_key": { "type": "string", "minLength": 1 },
+        "state_hash": { "type": "string", "minLength": 1 },
+        "input": {},
+        "output": {},
+        "data": {},
+        "source": { "$ref": "#/$defs/source_location" },
+        "raw": {},
+        "metadata": { "$ref": "#/$defs/metadata" }
+      },
+      "additionalProperties": false
+    },
+    "signal": {
+      "type": "object",
+      "required": ["record_type", "id", "trajectory_id", "name", "value"],
+      "properties": {
+        "record_type": { "const": "signal" },
+        "id": { "$ref": "#/$defs/id" },
+        "trajectory_id": { "$ref": "#/$defs/id" },
+        "event_id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "value": { "type": ["number", "string", "boolean"] },
+        "unit": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      },
+      "additionalProperties": false
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["record_type", "id", "trajectory_id", "media_type"],
+      "properties": {
+        "record_type": { "const": "artifact" },
+        "id": { "$ref": "#/$defs/id" },
+        "trajectory_id": { "$ref": "#/$defs/id" },
+        "event_id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "media_type": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "json": { "type": ["object", "array", "string", "number", "boolean"] },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      },
+      "oneOf": [
+        { "required": ["path"], "not": { "anyOf": [{ "required": ["text"] }, { "required": ["json"] }] } },
+        { "required": ["text"], "not": { "anyOf": [{ "required": ["path"] }, { "required": ["json"] }] } },
+        { "required": ["json"], "not": { "anyOf": [{ "required": ["path"] }, { "required": ["text"] }] } }
+      ],
+      "additionalProperties": false
+    },
+    "complete": {
+      "type": "object",
+      "required": ["record_type", "records", "warnings"],
+      "properties": {
+        "record_type": { "const": "complete" },
+        "records": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

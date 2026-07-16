@@ -1,0 +1,7 @@
+{"record_type":"run","id":"run-hostile"}
+{"record_type":"case","id":"case-hostile","run_id":"run-hostile"}
+{"record_type":"group","id":"group-hostile","case_id":"case-hostile"}
+{"record_type":"trajectory","id":"traj-hostile","group_id":"group-hostile"}
+{"record_type":"event","id":"evt-hostile","trajectory_id":"traj-hostile","sequence":0,"kind":"message","data":{"html":"<img src=x onerror=alert(1)>","command":"rm -rf /"},"raw":{"__proto__":{"polluted":true}}}
+{"record_type":"artifact","id":"artifact-hostile","trajectory_id":"traj-hostile","event_id":"evt-hostile","media_type":"text/html","path":"../../../../etc/passwd"}
+{"record_type":"complete","records":6,"warnings":0}

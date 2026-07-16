@@ -1,0 +1,3 @@
+{"record_type":"run","id":"same-id"}
+{"record_type":"case","id":"same-id","run_id":"same-id"}
+{"record_type":"complete","records":2,"warnings":0}

@@ -1,0 +1,14 @@
+{"record_type":"run","id":"run-group","name":"two sampled attempts","metadata":{"checkpoint":"1200","temperature":0.7}}
+{"record_type":"case","id":"case-search","run_id":"run-group","input":{"query":"capital of France"}}
+{"record_type":"group","id":"group-search","case_id":"case-search","metadata":{"sampling":"independent","samples":2}}
+{"record_type":"trajectory","id":"traj-success","group_id":"group-search","status":"completed","termination":"answer"}
+{"record_type":"trajectory","id":"traj-failure","group_id":"group-search","status":"failed","termination":"tool_error"}
+{"record_type":"event","id":"evt-success-call","trajectory_id":"traj-success","sequence":0,"kind":"tool","alignment_key":"search","input":{"name":"search","arguments":{"q":"capital of France"}},"output":{"result":"Paris"}}
+{"record_type":"event","id":"evt-failure-call","trajectory_id":"traj-failure","sequence":0,"kind":"tool","alignment_key":"search","input":{"name":"search","arguments":{"q":"France capital"}},"output":{"error":"timeout"}}
+{"record_type":"event","id":"evt-success-answer","trajectory_id":"traj-success","sequence":1,"kind":"generation","parent_id":"evt-success-call","output":{"content":"Paris"}}
+{"record_type":"event","id":"evt-failure-error","trajectory_id":"traj-failure","sequence":1,"kind":"error","parent_id":"evt-failure-call","data":{"code":"timeout","message":"search timed out"}}
+{"record_type":"signal","id":"sig-success-reward","trajectory_id":"traj-success","name":"reward","value":1}
+{"record_type":"signal","id":"sig-failure-reward","trajectory_id":"traj-failure","name":"reward","value":0}
+{"record_type":"signal","id":"sig-success-pass","trajectory_id":"traj-success","name":"pass","value":true}
+{"record_type":"signal","id":"sig-failure-pass","trajectory_id":"traj-failure","name":"pass","value":false}
+{"record_type":"complete","records":13,"warnings":0}

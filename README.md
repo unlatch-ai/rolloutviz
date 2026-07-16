@@ -15,13 +15,21 @@ The long-term goal is a lightweight workbench for people building agent environm
 
 ## Status
 
-RolloutViz is at the specification and initial implementation stage. The first milestone is deliberately narrow:
+RolloutViz has an initial single-trajectory vertical slice. It accepts canonical v1alpha1 NDJSON, validates the stream, starts a loopback-only server, and opens an embedded keyboard-first viewer:
 
 ```bash
-rolloutviz open ./path/to/trajectory.jsonl
+rlviz open ./path/to/trajectory.jsonl
 ```
 
-This will start a local viewer, open the trajectory in a browser, and keep the source data on the machine.
+Build it and open the included fixture:
+
+```bash
+make web-install
+make build
+./bin/rlviz open ./fixtures/canonical/linear.ndjson
+```
+
+The current `open` and `serve` commands run in the foreground. Background daemon reuse and external adapters are the next implementation milestones.
 
 ## Design principles
 
@@ -41,12 +49,13 @@ This will start a local viewer, open the trajectory in a browser, and keep the s
 
 ## Development
 
-The core is written in Go. The local web UI will use TypeScript and React and be embedded in the release binary.
+The core is written in Go. The local React and TypeScript viewer is compiled and embedded in the release binary.
 
 ```bash
+make web-install
 make check
 make build
-./bin/rolloutviz version
+./bin/rlviz version
 ```
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) before sending a change.

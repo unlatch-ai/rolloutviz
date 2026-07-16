@@ -1,0 +1,15 @@
+{
+  "api_version": "rolloutviz.dev/v1alpha1",
+  "operation": "probe",
+  "source": {
+    "path": "/workspace/traces/task-184.jsonl",
+    "root": "/workspace/traces",
+    "kind": "file",
+    "size_bytes": 8192,
+    "modified_at": "2026-01-15T12:00:00Z"
+  },
+  "limits": {
+    "probe_bytes": 65536,
+    "timeout_ms": 1000
+  }
+}
