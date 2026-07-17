@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { InlineArtifacts } from "./ArtifactPanel";
 import { bindingLabel, commandIds, useCommands, useKeymapRevision } from "./commands";
 import { json, preview, title } from "./format";
+import { StructuredToolDiff } from "./StructuredDiffView";
 import type { ComparisonResponse, TrajectoryEvent, VerifierResult } from "./types";
 import { VirtualList } from "./VirtualList";
 
@@ -120,6 +121,7 @@ export function ComparisonView({ comparison, onClose, initialStep, onStepChange 
       </section>
       <aside className="comparison-inspector">
         <div className="panel-heading"><span>Raw event payloads</span><span>step {selected + 1}</span></div>
+        <StructuredToolDiff left={selectedLeft} right={selectedRight} />
         <InlineArtifacts artifacts={left.artifacts} eventId={selectedLeft?.id} label={left.trajectory.id} />
         <section><h3>{left.trajectory.id}</h3>{selectedLeft ? <pre>{json(selectedLeft.raw ?? selectedLeft)}</pre> : <div className="raw-gap">No event on this side</div>}</section>
         <InlineArtifacts artifacts={right.artifacts} eventId={selectedRight?.id} label={right.trajectory.id} />

@@ -133,6 +133,8 @@ The React application has three levels of research surfaces:
 - `TrajectoryTabs.tsx`: transcript, raw event timeline, and outcome switching
 - `GroupView.tsx`: trajectory cohort table and compact behavioral paths
 - `ComparisonView.tsx`: aligned pair comparison and divergence navigation
+- `StructuredDiffView.tsx` and `structuredDiff.ts`: bounded selected-tool
+  argument/result differences without executing or interpreting payloads
 - `AnalysisPanel.tsx` and `ArtifactPanel.tsx`: derived findings and artifacts
 
 `research.ts` derives conservative, provenance-labeled display semantics from

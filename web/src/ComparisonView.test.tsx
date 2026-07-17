@@ -89,4 +89,15 @@ describe("trajectory comparison", () => {
     render(<ComparisonView comparison={{ ...comparison, differences: legacyDifferences }} onClose={() => {}} />);
     expect(screen.queryByRole("region", { name: "Research outcome and context differences" })).not.toBeInTheDocument();
   });
+
+  it("synchronizes structured tool differences with the selected alignment step", () => {
+    const leftEvents = [...comparison.left.events];
+    const rightEvents = [...comparison.right.events];
+    leftEvents[2] = { ...leftEvents[2], input: { name: "search", arguments: { query: "agent", limit: 5 } }, output: { ok: true, hits: 2 } };
+    rightEvents[2] = { ...rightEvents[2], kind: "tool", input: { name: "search", arguments: { query: "agent", limit: 10 } }, output: { ok: false, error: "timeout" } };
+    render(<ComparisonView comparison={{ ...comparison, left: { ...comparison.left, events: leftEvents }, right: { ...comparison.right, events: rightEvents } }} onClose={() => {}} />);
+    expect(screen.getByRole("region", { name: "Structured tool payload differences" })).toHaveTextContent("$.arguments.limit");
+    fireEvent.keyDown(window, { key: "j" });
+    expect(screen.queryByRole("region", { name: "Structured tool payload differences" })).not.toBeInTheDocument();
+  });
 });
