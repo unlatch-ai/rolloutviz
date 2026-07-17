@@ -6,7 +6,7 @@ afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState({}, "", "/"
 describe("trajectory API normalization", () => {
 	it("uses the stable trajectory ID from the viewer URL", () => {
 		expect(trajectoryEndpoint("?trajectory=abc/123")).toBe("/api/v1/trajectory?trajectory=abc%2F123");
-		expect(trajectoryEndpoint("?trajectory=abc&indexed=1&event=evt-2&view=compare&left=a&right=b&step=3")).toBe("/api/v1/indexed/trajectory?trajectory=abc&limit=200");
+		expect(trajectoryEndpoint("?trajectory=abc&demo=1&indexed=1&event=evt-2&surface=outcome&view=compare&left=a&right=b&step=3")).toBe("/api/v1/indexed/trajectory?trajectory=abc&limit=200");
 		expect(trajectoryEndpoint("")).toBe("/api/v1/trajectory");
 	});
 
@@ -18,7 +18,7 @@ describe("trajectory API normalization", () => {
   it("merges sibling events and canonical event data", () => {
     const trajectory = normalizeTrajectoryResponse({
       trajectory: { id: "traj-1", group_id: "group-1" },
-      run: { id: "run-1", started_at: "2026-01-01T00:00:00Z", metadata: { model: "checkpoint-42" } },
+      run: { id: "run-1", started_at: "2026-01-01T00:00:00Z", metadata: { checkpoint: "checkpoint-42" } },
       case: { id: "case-1", run_id: "run-1", name: "example case" },
       group: { id: "group-1", case_id: "case-1" },
       signals: [{ trajectory_id: "traj-1", name: "reward", value: 0.75 }],

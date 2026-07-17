@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadArtifactContent } from "./api";
+import { bindingLabel, commandIds, useKeymapRevision } from "./commands";
 import { json } from "./format";
 import type { TrajectoryArtifact } from "./types";
 
@@ -79,17 +80,19 @@ function SelectedArtifactPreview({ artifact, sourceId, trajectoryId }: { artifac
   </div>;
 }
 
-export function ArtifactPanel({ artifacts, sourceId, trajectoryId, selectedId, onSelect }: {
+export function ArtifactPanel({ artifacts, sourceId, trajectoryId, selectedId, onSelect, label = "Artifacts" }: {
   artifacts: TrajectoryArtifact[];
   sourceId: string;
   trajectoryId: string;
   selectedId: string;
   onSelect: (artifact: TrajectoryArtifact) => void;
+  label?: string;
 }) {
+  useKeymapRevision();
   const selected = useMemo(() => artifacts.find((artifact) => artifact.id === selectedId) ?? artifacts[0], [artifacts, selectedId]);
   if (!artifacts.length || !selected) return null;
-  return <section className="artifact-panel" aria-label="Trajectory artifacts">
-    <header><span>Artifacts</span><small>{artifacts.length} · <kbd>o</kbd> next</small></header>
+  return <section className="artifact-panel" aria-label={label}>
+    <header><span>{label}</span><small>{artifacts.length} · <kbd>{bindingLabel(commandIds.trajectory.nextArtifact)}</kbd> next</small></header>
     <div className="artifact-tabs">{artifacts.map((artifact) => <button key={artifact.id} className={artifact.id === selected.id ? "active" : ""} onClick={() => onSelect(artifact)} title={artifact.id}><strong>{artifactName(artifact)}</strong><small>{artifact.media_type}</small></button>)}</div>
     <SelectedArtifactPreview key={`${sourceId}\u0000${trajectoryId}\u0000${selected.id}`} artifact={selected} sourceId={sourceId} trajectoryId={trajectoryId} />
   </section>;

@@ -1,8 +1,17 @@
 # Coding-agent integrations
 
 RLViz is designed to be operated and extended by coding agents. These files
-are project-instruction snippets, not runtime plugins. Copy the relevant file
-into a repository where an agent needs to inspect rollout data:
+are project-instruction snippets, not runtime plugins. Print the relevant
+version-matched file from the installed binary:
+
+```bash
+rlviz setup agent codex --print
+rlviz setup agent claude-code --print
+rlviz setup agent cursor --print
+```
+
+The command never writes project files. Review and merge the output into the
+appropriate project destination:
 
 | Agent | Source | Project destination |
 | --- | --- | --- |

@@ -27,7 +27,13 @@ trusted plugin formats:
 ```bash
 rlviz demo
 rlviz formats
+rlviz inspect ./path/to/rollout.ndjson
+rlviz setup agent codex --print
 ```
+
+The setup command prints version-matched instructions for Codex, Claude Code,
+or Cursor without modifying the current project. Add `--json` for structured
+output an agent can consume.
 
 Build it and open a canonical fixture:
 

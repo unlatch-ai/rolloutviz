@@ -125,18 +125,22 @@ real formats before a protocol revision. See `data-model.md`.
 
 ## Frontend structure
 
-The current React application has four main surfaces:
+The React application has three levels of research surfaces:
 
-- `App.tsx`: trajectory loading, routing, timeline, event selection, inspector
+- `App.tsx`: trajectory loading, routing, shared event selection, landmark rail,
+  and selected-event-first inspector
+- `ResearchViews.tsx`: virtualized transcript and outcome/evidence views
+- `TrajectoryTabs.tsx`: transcript, raw event timeline, and outcome switching
 - `GroupView.tsx`: trajectory cohort table and compact behavioral paths
 - `ComparisonView.tsx`: aligned pair comparison and divergence navigation
 - `AnalysisPanel.tsx` and `ArtifactPanel.tsx`: derived findings and artifacts
 
+`research.ts` derives conservative, provenance-labeled display semantics from
+canonical records. `commands.ts` is the single command/keymap registry.
 `api.ts` is the typed daemon client, `types.ts` mirrors API records, and
-`VirtualList.tsx` bounds DOM work for long lists. The current component tree is
-functional but is not the target information architecture. New UI work should
-follow `ui-information-architecture.md` and `design-system.md` rather than
-extending the existing three-pane hierarchy by default.
+`VirtualList.tsx` bounds DOM work for long lists. Context compaction is currently
+recognized only through an explicit canonical `context:*` alignment key; richer
+context membership remains a future protocol decision.
 
 ## Security invariants
 

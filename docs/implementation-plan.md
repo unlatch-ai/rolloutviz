@@ -162,6 +162,9 @@ Milestones 0–7 are implemented in the repository: versioned contracts and fixt
 
 ## Milestone 8: product and design foundations
 
+Status: implemented for the trajectory workspace; screenshot automation and
+additional representative real-format fixtures remain ongoing quality work.
+
 ### Deliverables
 
 - Current system architecture and change map
@@ -180,12 +183,18 @@ Milestones 0–7 are implemented in the repository: versioned contracts and fixt
 
 ## Milestone 9: expert onboarding
 
+Status: rich demo, format inventory, and bounded inspection are implemented.
+Read-only, version-matched agent setup output is implemented for Codex, Claude
+Code, and Cursor. A write workflow remains intentionally deferred until its
+merge and overwrite semantics are specified.
+
 ### Deliverables
 
 - Rich bundled `rlviz demo` (implemented)
 - `rlviz formats [--json]` (implemented)
-- Read-only `rlviz inspect SOURCE [--json]`
-- Safe agent-integration print/setup commands
+- Read-only `rlviz inspect [--json] [--adapter PATH] SOURCE` (implemented)
+- Safe agent-integration print command (implemented)
+- Explicitly reviewed agent-integration write/setup workflow
 - Explicit supported-format documentation
 - Improved unsupported-format and adapter-scaffold guidance
 
@@ -197,6 +206,11 @@ Milestones 0–7 are implemented in the repository: versioned contracts and fixt
 - Agent setup never overwrites existing project instructions.
 
 ## Milestone 10: research-grade trajectory reader
+
+Status: transcript, event timeline, outcome/evidence, selected-event-first
+details, semantic landmarks, context-change jump, and long-run virtualization
+are implemented. A full context-usage track and minimap require the next
+source-backed data-model work.
 
 ### Deliverables
 
@@ -232,11 +246,16 @@ Milestones 0–7 are implemented in the repository: versioned contracts and fixt
 
 ## Near-term issue sequence
 
-1. Implement Milestone 8 before visually repainting the current three-pane viewer.
-2. Gather real adapter fixtures and use them to validate message, tool-span, verifier, and context semantics.
-3. Implement the rich demo and expert CLI onboarding against those semantics.
-4. Rebuild the single-trajectory reader, then apply the same system to groups and comparison.
-5. Validate the clean-machine install-to-open path on Linux; macOS curl, Homebrew, and npm paths are verified.
+1. Specify safe agent setup write/merge semantics and complete the
+   adapter-authoring tutorial.
+2. Gather real adapter fixtures and use them to validate message, tool-span,
+   verifier, and context semantics.
+3. Design the context-usage track and minimap only after those mappings are
+   supported by the canonical model.
+4. Apply the trajectory design system to richer cohort distributions,
+   structured pair diffs, and safe declarative customization.
+5. Validate the clean-machine install-to-open path on Linux; macOS curl,
+   Homebrew, and npm paths are verified.
 
 ## Quality gates
 

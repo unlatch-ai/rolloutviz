@@ -74,10 +74,8 @@ rlviz inspect --json ./path/to/rollout
 - exact next command
 
 It never starts the viewer or mutates the source.
-
-`inspect` is the next onboarding command to implement. Until then, use
-`rlviz open --json SOURCE`; unsupported inputs already return a structured
-diagnostic without mutating the source.
+With `--adapter PATH`, it executes only the explicit trusted adapter's bounded
+`probe` operation; it never invokes `stream`.
 
 ### 5. Open it
 
@@ -110,15 +108,18 @@ step or imply that generated code is automatically safe.
 
 ## Coding-agent setup
 
-The repository already ships equivalent instructions for Codex, Claude Code,
-and Cursor. The target CLI makes them discoverable without overwriting existing
-project rules:
+The binary ships equivalent version-matched instructions for Codex, Claude
+Code, and Cursor. Print them without overwriting existing project rules:
 
 ```bash
 rlviz setup agent codex --print
 rlviz setup agent claude-code --print
 rlviz setup agent cursor --print
 ```
+
+Add `--json` for a stable envelope containing the agent, bundled source,
+suggested project destination, and instruction content. The command is
+read-only and requires `--print`; it does not create or modify project files.
 
 A future `--write` mode may create a dedicated include or rule file. It must:
 

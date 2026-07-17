@@ -5,9 +5,10 @@ export type CommandScope = "trajectory" | "group" | "paths" | "comparison";
 export const commandIds = {
   trajectory: {
     dismiss: "trajectory.dismiss", search: "trajectory.search", next: "trajectory.next", previous: "trajectory.previous",
-    nextError: "trajectory.nextError", nextReward: "trajectory.nextReward", nextFinding: "trajectory.nextFinding",
+    nextError: "trajectory.nextError", nextReward: "trajectory.nextReward", nextContext: "trajectory.nextContext", nextFinding: "trajectory.nextFinding",
     nextArtifact: "trajectory.nextArtifact", toggleRaw: "trajectory.toggleRaw", openGroup: "trajectory.openGroup",
     toggleHelp: "trajectory.toggleHelp", toggleExpanded: "trajectory.toggleExpanded",
+    openTranscript: "trajectory.openTranscript", openTimeline: "trajectory.openTimeline", openOutcome: "trajectory.openOutcome",
   },
   group: {
     back: "group.back", togglePaths: "group.togglePaths", search: "group.search", next: "group.next",
@@ -41,12 +42,16 @@ export const commands: readonly CommandDefinition[] = [
   { id: commandIds.trajectory.previous, scope: "trajectory", label: "Previous event", defaultBindings: ["k"] },
   { id: commandIds.trajectory.nextError, scope: "trajectory", label: "Jump to next error", defaultBindings: ["e"] },
   { id: commandIds.trajectory.nextReward, scope: "trajectory", label: "Jump to next reward or grader", defaultBindings: ["r"] },
+  { id: commandIds.trajectory.nextContext, scope: "trajectory", label: "Jump to next context change", defaultBindings: ["c"] },
   { id: commandIds.trajectory.nextFinding, scope: "trajectory", label: "Jump through analyzer findings", defaultBindings: ["a"] },
   { id: commandIds.trajectory.nextArtifact, scope: "trajectory", label: "Open next artifact", defaultBindings: ["o"] },
   { id: commandIds.trajectory.toggleRaw, scope: "trajectory", label: "Toggle raw event record", defaultBindings: ["x"] },
   { id: commandIds.trajectory.openGroup, scope: "trajectory", label: "Compare trajectory group", defaultBindings: ["g"] },
   { id: commandIds.trajectory.toggleHelp, scope: "trajectory", label: "Toggle keyboard shortcuts", defaultBindings: ["?"] },
   { id: commandIds.trajectory.toggleExpanded, scope: "trajectory", label: "Expand selected event", defaultBindings: ["Enter", "Space"] },
+  { id: commandIds.trajectory.openTranscript, scope: "trajectory", label: "Open transcript", defaultBindings: ["1"] },
+  { id: commandIds.trajectory.openTimeline, scope: "trajectory", label: "Open event timeline", defaultBindings: ["2"] },
+  { id: commandIds.trajectory.openOutcome, scope: "trajectory", label: "Open outcome", defaultBindings: ["3"] },
 
   { id: commandIds.group.back, scope: "group", label: "Back to trajectory", defaultBindings: ["Escape"], allowInInput: true },
   { id: commandIds.group.togglePaths, scope: "group", label: "Toggle behavioral paths", defaultBindings: ["p"] },

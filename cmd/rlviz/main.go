@@ -61,6 +61,10 @@ func main() {
 		runDoctor(os.Args[2:])
 	case "formats":
 		runFormats(os.Args[2:])
+	case "inspect":
+		runInspect(os.Args[2:])
+	case "setup":
+		runSetup(os.Args[2:])
 	case "cache":
 		runCache(os.Args[2:])
 	case "plugin":
@@ -645,6 +649,8 @@ Usage:
   rlviz stop [--json]
   rlviz doctor [--json]
   rlviz formats [--json]
+  rlviz inspect [--json] [--adapter PATH] SOURCE
+  rlviz setup agent <codex|claude-code|cursor> --print [--json]
   rlviz cache <status|clean>
   rlviz plugin <init|trust|validate|list|revoke>
   rlviz version [--json]

@@ -21,6 +21,7 @@ func TestDemoFixtureRepresentsDistinctResearchOutcomes(t *testing.T) {
 	toolEvents := 0
 	graderEvents := 0
 	rewardEvents := 0
+	contextEvents := 0
 	artifacts := 0
 	records := 0
 
@@ -30,6 +31,9 @@ func TestDemoFixtureRepresentsDistinctResearchOutcomes(t *testing.T) {
 		case *Trajectory:
 			terminations[value.ID] = value.Status + "/" + value.Termination
 		case *Event:
+			if value.AlignmentKey == "context:compaction" {
+				contextEvents++
+			}
 			switch value.Kind {
 			case "message":
 				if input, ok := value.Input.(map[string]any); ok {
@@ -69,8 +73,8 @@ func TestDemoFixtureRepresentsDistinctResearchOutcomes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if records != 60 {
-		t.Fatalf("decoded %d records, want 60 including complete", records)
+	if records != 63 {
+		t.Fatalf("decoded %d records, want 63 including complete", records)
 	}
 	wantTerminations := map[string]string{
 		"traj-demo-success":        "completed/success",
@@ -87,6 +91,9 @@ func TestDemoFixtureRepresentsDistinctResearchOutcomes(t *testing.T) {
 	}
 	if toolEvents != 8 || graderEvents != 3 || rewardEvents != 3 || artifacts != 2 {
 		t.Errorf("fixture coverage tools=%d graders=%d rewards=%d artifacts=%d", toolEvents, graderEvents, rewardEvents, artifacts)
+	}
+	if contextEvents != 3 {
+		t.Errorf("fixture context compactions=%d, want 3", contextEvents)
 	}
 	if decisionKeys["traj-demo-success"] != "decision:edit-allowlist" ||
 		decisionKeys["traj-demo-infra-failure"] != "decision:edit-allowlist" ||

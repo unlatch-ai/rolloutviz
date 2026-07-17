@@ -113,6 +113,15 @@ facts. Missing context data should degrade honestly rather than simulate it.
 The lossless normalized records and source locations. This is the debugging
 escape hatch, not the default reading experience.
 
+### Current implementation
+
+Transcript, event timeline, and outcome are implemented as one shared-selection
+workspace. The transcript is virtualized, deterministic turn boundaries are
+labeled inferred, and final output, graders, reward components, errors, and
+evidence link back to canonical events. Explicit `context:*` alignment keys
+appear as context landmarks and are keyboard reachable. The richer context
+usage track waits for a real cross-format canonical contract.
+
 ## Landmark rail and minimap
 
 Long rollouts need semantic navigation rather than a second copy of the event
@@ -185,6 +194,10 @@ handlers. A central registry owns:
 - user overrides stored locally
 - conflict detection, reset, import, and export
 - command palette and shortcut reference generated from the same registry
+
+The registry, local rebind UI, persistence, conflict detection, and generated
+key hints are implemented. Command-palette and keymap import/export remain
+future work.
 
 Core commands include next/previous landmark, next/previous turn, expand,
 inspect, search, next error, next context change, next grader, open outcome,

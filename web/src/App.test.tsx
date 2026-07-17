@@ -36,6 +36,7 @@ describe("trajectory navigation", () => {
       removeItem: (key: string) => { values.delete(key); },
     });
     render(<App initialTrajectory={sampleTrajectory} />);
+    fireEvent.click(screen.getByRole("tab", { name: /Events/ }));
     const expand = screen.getAllByRole("button", { name: /Expand event/ })[0];
     expect(expand).toHaveTextContent("Enter / Space");
 
@@ -80,6 +81,14 @@ describe("trajectory navigation", () => {
     expect(screen.getByText(/STALE_CONFIRMATION/, { selector: ".raw-json" })).toBeInTheDocument();
   });
 
+  it("jumps to source-native context changes with c", () => {
+    const withCompaction: Trajectory = { ...sampleTrajectory, events: [...sampleTrajectory.events, { id: "context", sequence: 11, kind: "state", title: "Context compacted", alignment_key: "context:compaction", data: { before_tokens: 8000, after_tokens: 2000 } }] };
+    const { container } = render(<App initialTrajectory={withCompaction} />);
+    fireEvent.keyDown(window, { key: "c" });
+    expect(screen.getByText("Context compacted", { selector: ".selected-heading h3" })).toBeInTheDocument();
+    expect(container.querySelector(".keybar")).toHaveTextContent("context");
+  });
+
   it("opens search with slash and filters events", () => {
     render(<App initialTrajectory={sampleTrajectory} />);
     fireEvent.keyDown(window, { key: "/" });
@@ -90,16 +99,30 @@ describe("trajectory navigation", () => {
     expect(screen.queryByText("Task prompt", { selector: ".event-card h2" })).not.toBeInTheDocument();
   });
 
+  it("opens transcript by default and switches research surfaces with 1, 2, and 3", () => {
+    render(<App initialTrajectory={sampleTrajectory} />);
+    expect(screen.getByRole("tab", { name: /Transcript/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Trajectory transcript")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "2" });
+    expect(screen.getByRole("tab", { name: /Events/ })).toHaveAttribute("aria-selected", "true");
+    expect(document.querySelector(".event-card")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "3" });
+    expect(screen.getByRole("tab", { name: /Outcome/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Trajectory outcome")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "1" });
+    expect(new URLSearchParams(window.location.search).has("surface")).toBe(false);
+  });
+
   it("bounds rendered nodes for 10,000 events and mounts keyboard-selected events", () => {
     const { container } = render(<App initialTrajectory={largeTrajectory} />);
-    expect(container.querySelectorAll(".event-card").length).toBeLessThan(30);
+    expect(container.querySelectorAll(".transcript-entry").length).toBeLessThan(30);
     expect(container.querySelectorAll(".outline-virtual button").length).toBeLessThan(30);
 
     fireEvent.keyDown(window, { key: "e" });
     expect(screen.getByText("Event 10000", { selector: ".selected-heading h3" })).toBeInTheDocument();
     expect(container.querySelector("#event-large-9999")).toHaveClass("selected");
     expect(container.querySelector('.outline-virtual button[aria-current="true"]')).toHaveTextContent("Event 10000");
-    expect(container.querySelectorAll(".event-card").length).toBeLessThan(30);
+    expect(container.querySelectorAll(".transcript-entry").length).toBeLessThan(30);
     expect(container.querySelectorAll(".outline-virtual button").length).toBeLessThan(30);
   });
 
@@ -110,7 +133,7 @@ describe("trajectory navigation", () => {
     const result = screen.getByText("Event 5432", { selector: ".outline-text b" });
     fireEvent.click(result);
     expect(screen.getByText("Event 5432", { selector: ".selected-heading h3" })).toBeInTheDocument();
-    expect(container.querySelectorAll(".event-card")).toHaveLength(1);
+    expect(container.querySelectorAll(".transcript-entry")).toHaveLength(1);
     expect(container.querySelectorAll(".outline-virtual button")).toHaveLength(1);
   });
 

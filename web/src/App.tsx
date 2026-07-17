@@ -3,10 +3,15 @@ import { AnalysisPanel } from "./AnalysisPanel";
 import { ArtifactPanel } from "./ArtifactPanel";
 import { loadAnalysis, loadChildPage, loadComparison, loadEventPage, loadGroup, loadGroupPaths, loadTrajectory } from "./api";
 import { ComparisonView } from "./ComparisonView";
-import { bindingLabel, commandDefinition, commandIds, useCommands, useKeymapRevision } from "./commands";
+import { bindingLabel, commandIds, useCommands, useKeymapRevision } from "./commands";
 import { duration, eventText, json, payload, preview, time, title } from "./format";
 import { GroupView } from "./GroupView";
+import { KeymapDialog } from "./KeymapDialog";
+import { deriveLandmark, isContextEvent } from "./research";
+import { OutcomeView, TranscriptView } from "./ResearchViews";
 import { sampleTrajectory } from "./sample";
+import { TrajectoryTabs } from "./TrajectoryTabs";
+import type { TrajectorySurface } from "./TrajectoryTabs";
 import type { AnalysisResponse, ComparisonResponse, GroupPathsResponse, GroupResponse, IndexedSource, Trajectory, TrajectoryArtifact, TrajectoryEvent } from "./types";
 import { VirtualList } from "./VirtualList";
 
@@ -20,6 +25,9 @@ const eventKey = (event: TrajectoryEvent) => event.id;
 const viewerKeys = ["view", "left", "right", "step"];
 function validID(value: string | null, max = 512): string | null {
   return value && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value) ? value : null;
+}
+function validSurface(value: string | null): TrajectorySurface {
+  return value === "timeline" || value === "outcome" ? value : "transcript";
 }
 function replaceParams(update: (params: URLSearchParams) => void) {
   const params = new URLSearchParams(globalThis.location?.search ?? "");
@@ -69,6 +77,9 @@ function TimelineCard({ event, selected, expanded, position, total, onSelect, on
 }
 
 function Inspector({ event, raw, analysis, analysisLoading, analysisError, onRetryAnalysis, onJump, artifacts, sourceId, trajectoryId, selectedArtifactId, onSelectArtifact }: { event: TrajectoryEvent; raw: boolean; analysis: AnalysisResponse | null; analysisLoading: boolean; analysisError: string; onRetryAnalysis: () => void; onJump: (id: string) => void; artifacts: TrajectoryArtifact[]; sourceId: string; trajectoryId: string; selectedArtifactId: string; onSelectArtifact: (artifact: TrajectoryArtifact) => void }) {
+  const landmark = deriveLandmark(event);
+  const linkedArtifacts = artifacts.filter((artifact) => artifact.event_id === event.id);
+  const trajectoryArtifacts = artifacts.filter((artifact) => artifact.event_id !== event.id);
   const entries = [
     ["Event ID", event.id], ["Sequence", event.sequence], ["Kind", event.kind], ["Time", event.timestamp],
     ["Duration", event.duration_ms === undefined ? undefined : duration(event.duration_ms)], ["Tokens", event.token_count],
@@ -76,11 +87,9 @@ function Inspector({ event, raw, analysis, analysisLoading, analysisError, onRet
   ].filter((entry) => entry[1] !== undefined) as [string, unknown][];
   return (
     <aside className="inspector">
-      <div className="panel-heading"><span>Inspector</span><span className="panel-hint">x raw</span></div>
-      <AnalysisPanel analysis={analysis} loading={analysisLoading} error={analysisError} onRetry={onRetryAnalysis} onJump={onJump} />
-      <ArtifactPanel artifacts={artifacts} sourceId={sourceId} trajectoryId={trajectoryId} selectedId={selectedArtifactId} onSelect={onSelectArtifact} />
+      <div className="panel-heading"><span>Details</span><span className="panel-hint">{bindingLabel(commandIds.trajectory.toggleRaw)} raw</span></div>
+      <div className="selected-heading"><Kind kind={event.kind} /><div><h3>{landmark.label}</h3><span>event {event.sequence}</span></div></div>
       <div className="inspector-scroll">
-        <div className="selected-heading"><Kind kind={event.kind} /><div><h3>{title(event)}</h3><span>event {event.sequence}</span></div></div>
         {raw ? <section><h4>Raw normalized record</h4><pre className="raw-json">{json(event.raw ?? event)}</pre></section> : <>
           <section><h4>Properties</h4><dl>{entries.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>)}</dl></section>
           {event.source && <section><h4>Source</h4><div className="source-path">{event.source.path || "Unknown source"}</div><div className="source-detail">{event.source.line && `line ${event.source.line}`}{(event.source.byte_offset ?? event.source.byte_start) !== undefined && ` · bytes ${event.source.byte_offset ?? event.source.byte_start}–${event.source.byte_length !== undefined ? (event.source.byte_offset ?? 0) + event.source.byte_length : (event.source.byte_end ?? "?")}`}</div></section>}
@@ -89,6 +98,9 @@ function Inspector({ event, raw, analysis, analysisLoading, analysisError, onRet
           {(event.content ?? event.data) !== undefined && <section><h4>Content</h4><pre className="raw-json compact">{typeof (event.content ?? event.data) === "string" ? String(event.content ?? event.data) : json(event.content ?? event.data)}</pre></section>}
           {event.metadata && <section><h4>Metadata</h4><pre className="raw-json compact">{json(event.metadata)}</pre></section>}
         </>}
+        <ArtifactPanel artifacts={linkedArtifacts} sourceId={sourceId} trajectoryId={trajectoryId} selectedId={selectedArtifactId} onSelect={onSelectArtifact} label="Linked artifacts" />
+        <AnalysisPanel analysis={analysis} loading={analysisLoading} error={analysisError} onRetry={onRetryAnalysis} onJump={onJump} />
+        <ArtifactPanel artifacts={trajectoryArtifacts} sourceId={sourceId} trajectoryId={trajectoryId} selectedId={selectedArtifactId} onSelect={onSelectArtifact} label="Other artifacts" />
       </div>
     </aside>
   );
@@ -108,6 +120,7 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [raw, setRaw] = useState(false);
   const [help, setHelp] = useState(false);
+  const [surface, setSurface] = useState<TrajectorySurface>(() => validSurface(new URLSearchParams(globalThis.location?.search ?? "").get("surface")));
   const [group, setGroup] = useState<GroupResponse | null>(null);
   const [groupPaths, setGroupPaths] = useState<GroupPathsResponse | null>(null);
   const [groupPathsError, setGroupPathsError] = useState("");
@@ -280,12 +293,22 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
   const selected = trajectory.events.find((event) => event.id === selectedId) || visible[0] || trajectory.events[0];
   const selectedVisibleIndex = visible.findIndex((event) => event.id === selected.id);
   const analysisEventIds = useMemo(() => [...new Set((analysis?.analysis.findings ?? []).flatMap((finding) => finding.event_ids ?? []))], [analysis]);
+  const landmarks = useMemo(() => new Map(trajectory.events.map((event) => [event.id, deriveLandmark(event)])), [trajectory.events]);
 
   const selectEvent = (id: string) => {
     if (!trajectory.events.some((event) => event.id === id)) return;
     setSelectedId(id);
     replaceParams((params) => params.set("event", id));
   };
+  const openSurface = (next: TrajectorySurface) => {
+    setSurface(next);
+    replaceParams((params) => next === "transcript" ? params.delete("surface") : params.set("surface", next));
+  };
+
+  useEffect(() => {
+    if (surface !== "transcript") return;
+    requestAnimationFrame(() => document.getElementById(`event-${selectedId}`)?.scrollIntoView({ block: "nearest" }));
+  }, [selectedId, surface]);
 
   const move = (delta: number, predicate?: (event: TrajectoryEvent) => boolean) => {
     const candidates = predicate ? visible.filter(predicate) : visible;
@@ -354,12 +377,16 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
     [commandIds.trajectory.previous]: () => move(-1),
     [commandIds.trajectory.nextError]: () => move(1, (item) => item.kind === "error"),
     [commandIds.trajectory.nextReward]: () => move(1, (item) => item.kind === "reward" || item.kind === "grader"),
+    [commandIds.trajectory.nextContext]: () => move(1, isContextEvent),
     [commandIds.trajectory.nextFinding]: moveAnalysis,
     [commandIds.trajectory.nextArtifact]: moveArtifact,
     [commandIds.trajectory.toggleRaw]: () => setRaw((value) => !value),
     [commandIds.trajectory.openGroup]: () => trajectory.group_id ? void openGroup() : false,
     [commandIds.trajectory.toggleHelp]: () => setHelp((value) => !value),
     [commandIds.trajectory.toggleExpanded]: () => selected ? toggleExpand(selected.id) : false,
+    [commandIds.trajectory.openTranscript]: () => openSurface("transcript"),
+    [commandIds.trajectory.openTimeline]: () => openSurface("timeline"),
+    [commandIds.trajectory.openOutcome]: () => openSurface("outcome"),
   }, !group && !comparison);
 
   if (comparison) return <div className="app-shell group-shell comparison-shell">
@@ -385,22 +412,24 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
       </div>
       <div className="workspace">
         <aside className="outline">
-          <div className="panel-heading"><span>Events</span><span>{visible.length}/{trajectory.events.length}</span></div>
+          <div className="panel-heading"><span>Landmarks</span><span>{visible.length}/{trajectory.events.length}</span></div>
           <div className={`search ${searchOpen ? "open" : ""}`}><span>⌕</span><input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events" aria-label="Search events" /><kbd>{bindingLabel(commandIds.trajectory.search)}</kbd></div>
           <div className="filters">{filterKinds.filter((kind) => kind === "all" || counts[kind]).map((kind) => <button key={kind} className={filter === kind ? "active" : ""} onClick={() => setFilter(kind)}><span>{kind}</span><b>{kind === "all" ? trajectory.events.length : counts[kind]}</b></button>)}</div>
-          <nav ref={outlineRef} className="event-outline" aria-label="Event outline">
-            <VirtualList items={visible} estimateSize={47} overscan={6} selectedIndex={selectedVisibleIndex} scrollRef={outlineRef} className="outline-virtual" itemKey={eventKey} renderItem={(event, index) => <button className={selected.id === event.id ? "active" : ""} aria-current={selected.id === event.id ? "true" : undefined} aria-posinset={index + 1} aria-setsize={visible.length} onClick={() => selectEvent(event.id)}><Kind kind={event.kind} /><span className="outline-text"><b>{title(event)}</b><small>{event.kind} · {duration(event.duration_ms)}</small></span><span className="outline-seq">{event.sequence}</span></button>} />
+          <nav ref={outlineRef} className="event-outline" aria-label="Trajectory landmarks">
+            <VirtualList items={visible} estimateSize={47} overscan={6} selectedIndex={selectedVisibleIndex} scrollRef={outlineRef} className="outline-virtual" itemKey={eventKey} renderItem={(event, index) => { const landmark = landmarks.get(event.id); return <button className={selected.id === event.id ? "active" : ""} aria-current={selected.id === event.id ? "true" : undefined} aria-posinset={index + 1} aria-setsize={visible.length} onClick={() => selectEvent(event.id)}><Kind kind={event.kind} /><span className="outline-text"><b>{landmark?.label ?? title(event)}</b><small>{landmark?.category ?? event.kind} · {duration(event.duration_ms)}</small></span><span className="outline-seq">{event.sequence}</span></button>; }} />
           </nav>
           {!visible.length && <div className="no-results">No matching events</div>}
         </aside>
-        <main ref={timelineRef} className="timeline" aria-label="Trajectory timeline">
-          <div className="timeline-heading"><div><h1>{trajectory.name || trajectory.id}</h1><p>{trajectory.id} · {trajectory.started_at ? new Date(trajectory.started_at).toLocaleString() : "local trajectory"}</p></div><div className="legend"><span><i className="action"></i>action</span><span><i className="observation"></i>observation</span><span><i className="signal"></i>signal</span></div></div>
-          <VirtualList items={visible} estimateSize={118} overscan={4} selectedIndex={selectedVisibleIndex} scrollRef={timelineRef} className="timeline-events" itemKey={eventKey} renderItem={(event, index) => <TimelineCard event={event} selected={selected.id === event.id} expanded={expanded.has(event.id)} position={index + 1} total={visible.length} onSelect={() => selectEvent(event.id)} onExpand={() => toggleExpand(event.id)} />} />
+        <main ref={timelineRef} className="timeline" aria-label="Trajectory workspace">
+          <div className="timeline-heading"><div><h1>{trajectory.name || trajectory.id}</h1><p>{trajectory.id} · {trajectory.started_at ? new Date(trajectory.started_at).toLocaleString() : "local trajectory"}</p></div><TrajectoryTabs active={surface} onChange={openSurface} /></div>
+          {surface === "transcript" && <TranscriptView events={visible} selectedId={selected.id} selectedIndex={selectedVisibleIndex} scrollRef={timelineRef} onSelect={selectEvent} />}
+          {surface === "timeline" && <VirtualList items={visible} estimateSize={118} overscan={4} selectedIndex={selectedVisibleIndex} scrollRef={timelineRef} className="timeline-events" itemKey={eventKey} renderItem={(event, index) => <TimelineCard event={event} selected={selected.id === event.id} expanded={expanded.has(event.id)} position={index + 1} total={visible.length} onSelect={() => selectEvent(event.id)} onExpand={() => toggleExpand(event.id)} />} />}
+          {surface === "outcome" && <OutcomeView trajectory={trajectory} onSelect={(id) => { selectEvent(id); openSurface("transcript"); }} />}
         </main>
         <Inspector event={selected} raw={raw} analysis={analysis} analysisLoading={analysisLoading} analysisError={analysisError} onRetryAnalysis={() => setAnalysisVersion((version) => version + 1)} onJump={jumpToEvent} artifacts={trajectory.artifacts ?? []} sourceId={sourceId} trajectoryId={trajectory.id} selectedArtifactId={selectedArtifactId} onSelectArtifact={selectArtifact} />
       </div>
-      <footer className="keybar"><span><kbd>{bindingLabel(commandIds.trajectory.next)}</kbd><kbd>{bindingLabel(commandIds.trajectory.previous)}</kbd> navigate</span><span><kbd>{bindingLabel(commandIds.trajectory.toggleExpanded)}</kbd> expand</span>{trajectory.group_id && <span><kbd>{bindingLabel(commandIds.trajectory.openGroup)}</kbd> group</span>}{analysisEventIds.length > 0 && <span><kbd>{bindingLabel(commandIds.trajectory.nextFinding)}</kbd> finding</span>}{(trajectory.artifacts?.length ?? 0) > 0 && <span><kbd>{bindingLabel(commandIds.trajectory.nextArtifact)}</kbd> artifact</span>}<span><kbd>{bindingLabel(commandIds.trajectory.nextError)}</kbd> error</span><span><kbd>{bindingLabel(commandIds.trajectory.nextReward)}</kbd> reward</span><span><kbd>{bindingLabel(commandIds.trajectory.toggleRaw)}</kbd> raw</span><span><kbd>{bindingLabel(commandIds.trajectory.toggleHelp)}</kbd> shortcuts</span></footer>
-      {help && <div className="modal-backdrop" onMouseDown={() => setHelp(false)}><div className="help-modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" onMouseDown={(e) => e.stopPropagation()}><header><div><span className="eyebrow">Navigation</span><h2>Keyboard shortcuts</h2></div><button onClick={() => setHelp(false)} aria-label="Close shortcuts">×</button></header><div className="shortcut-grid">{Object.values(commandIds.trajectory).map((id) => <div key={id}><kbd>{bindingLabel(id)}</kbd><span>{commandDefinition(id).label}</span></div>)}</div></div></div>}
+      <footer className="keybar"><span><kbd>{bindingLabel(commandIds.trajectory.next)}</kbd><kbd>{bindingLabel(commandIds.trajectory.previous)}</kbd> navigate</span>{surface === "timeline" && <span><kbd>{bindingLabel(commandIds.trajectory.toggleExpanded)}</kbd> expand</span>}{trajectory.group_id && <span><kbd>{bindingLabel(commandIds.trajectory.openGroup)}</kbd> group</span>}{analysisEventIds.length > 0 && <span><kbd>{bindingLabel(commandIds.trajectory.nextFinding)}</kbd> finding</span>}{(trajectory.artifacts?.length ?? 0) > 0 && <span><kbd>{bindingLabel(commandIds.trajectory.nextArtifact)}</kbd> artifact</span>}{trajectory.events.some(isContextEvent) && <span><kbd>{bindingLabel(commandIds.trajectory.nextContext)}</kbd> context</span>}<span><kbd>{bindingLabel(commandIds.trajectory.nextError)}</kbd> error</span><span><kbd>{bindingLabel(commandIds.trajectory.nextReward)}</kbd> reward</span><span><kbd>{bindingLabel(commandIds.trajectory.toggleRaw)}</kbd> raw</span><span><kbd>{bindingLabel(commandIds.trajectory.toggleHelp)}</kbd> shortcuts</span></footer>
+      <KeymapDialog open={help} onClose={() => setHelp(false)} />
     </div>
   );
 }

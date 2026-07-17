@@ -50,6 +50,11 @@ Formats with private schemas, rapid internal churn, or customer-specific fields
 should remain adapters. Useful adapters may be published separately without
 expanding the core binary.
 
+`rlviz inspect [--json] [--adapter PATH] SOURCE` performs bounded, read-only
+format detection without starting the daemon or browser. An explicit adapter
+must already be trusted; inspection invokes its `probe` operation but never
+`stream`.
+
 `rlviz formats [--json]` generates its output from the built-in decoder and
 current trust store. It reports unavailable and digest-changed plugin entries
 without executing them. Future adapter discovery will extend the same result

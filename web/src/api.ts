@@ -8,7 +8,7 @@ export function trajectoryEndpoint(search = globalThis.location?.search ?? ""): 
   const indexed = params.get("indexed") === "1";
   params.delete("indexed");
   // Viewer state belongs in shareable URLs, but is not part of the daemon API.
-  for (const key of ["event", "view", "left", "right", "step"]) params.delete(key);
+  for (const key of ["demo", "event", "surface", "view", "left", "right", "step"]) params.delete(key);
   if (indexed && !params.has("limit")) params.set("limit", "200");
   const query = params.toString();
   return `${indexed ? "/api/v1/indexed/trajectory" : "/api/v1/trajectory"}${query ? `?${query}` : ""}`;
@@ -42,14 +42,17 @@ export function normalizeTrajectoryResponse(payload: TrajectoryResponse): Trajec
     const events = (payload.events ?? payload.trajectory.events ?? []).map(normalizeEvent);
     const trajectorySignals = (payload.signals ?? []).filter((signal) => signal.trajectory_id === payload.trajectory?.id);
     const rewardSignal = trajectorySignals.find((signal) => signal.name.toLowerCase() === "reward" && typeof signal.value === "number");
-    const runModel = payload.run?.metadata && typeof payload.run.metadata.model === "string" ? payload.run.metadata.model : undefined;
+    const trajectoryModel = typeof payload.trajectory.metadata?.model === "string" ? payload.trajectory.metadata.model
+      : typeof payload.trajectory.metadata?.checkpoint === "string" ? payload.trajectory.metadata.checkpoint : undefined;
+    const runModel = payload.run?.metadata && typeof payload.run.metadata.model === "string" ? payload.run.metadata.model
+      : payload.run?.metadata && typeof payload.run.metadata.checkpoint === "string" ? payload.run.metadata.checkpoint : undefined;
     return {
       ...payload.trajectory,
       name: payload.trajectory.name ?? payload.case?.name,
       run_id: payload.trajectory.run_id ?? payload.run?.id ?? payload.case?.run_id,
       case_id: payload.trajectory.case_id ?? payload.case?.id ?? payload.group?.case_id,
       group_id: payload.trajectory.group_id ?? payload.group?.id,
-      model: payload.trajectory.model ?? runModel,
+      model: payload.trajectory.model ?? trajectoryModel ?? runModel,
       started_at: payload.trajectory.started_at ?? payload.run?.started_at,
       total_reward: payload.trajectory.total_reward ?? (typeof rewardSignal?.value === "number" ? rewardSignal.value : undefined),
       events,
