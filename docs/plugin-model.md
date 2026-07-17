@@ -61,8 +61,11 @@ silently expand adapters or analyzers into UI-code plugins.
 
 ## Discovery and trust
 
-Future discovery should use explicit project and user plugin directories,
-bounded manifest reads, and deterministic probe ranking. Discovery is not trust.
-Executable plugins still require an approved path and digest. Presentation-only
-configuration may use a separate schema-validation path because it cannot
-execute code.
+`rlviz formats` now provides bounded manifest inventory from explicit roots,
+project `.rlviz/plugins`, and the user plugin directory. Its rank is a stable
+inventory order only; it does not imply compatibility with a source. Discovery
+does not probe, execute, select, or trust a plugin. Executable plugins still
+require an explicit adapter path and an approved content digest. Automatic
+source probing remains future work and must preserve those trust boundaries.
+Presentation-only configuration may use a separate schema-validation path
+because it cannot execute code.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +22,39 @@ func TestCollectFormatsAlwaysReportsCanonicalNDJSON(t *testing.T) {
 	}
 	if text := formatListText(result.Formats); !strings.Contains(text, "Trusted plugins:\n  none") {
 		t.Fatalf("format list = %q", text)
+	}
+}
+
+func TestCollectFormatsIncludesSchemaVersionedDiscoveryInventory(t *testing.T) {
+	discovery := plugins.DiscoveryResult{
+		SchemaVersion: 1,
+		Plugins: []plugins.DiscoveredPlugin{{
+			Rank: 1, Source: "project", Path: "/repo/.rlviz/plugins/customer",
+			ManifestPath: "/repo/.rlviz/plugins/customer/rlviz-plugin.yaml",
+			Name:         "customer", Kind: "Adapter", APIVersion: plugins.APIVersion,
+			Version: "1.0.0", Status: "untrusted",
+		}},
+		Issues: []plugins.DiscoveryIssue{{Root: "/extra", Code: "root_unreadable", Error: "denied"}},
+	}
+	result := collectFormats(nil, discovery)
+	if result.SchemaVersion != 1 || len(result.DiscoveryIssues) != 1 || len(result.Formats) != 2 {
+		t.Fatalf("result = %#v", result)
+	}
+	got := result.Formats[1]
+	if got.Name != "customer" || got.Source != "project_plugin" || got.Status != "untrusted" || got.Rank != 1 {
+		t.Fatalf("discovered format = %#v", got)
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{`"schema_version":1`, `"discovery_issues"`, `"status":"untrusted"`, `"rank":1`} {
+		if !strings.Contains(string(raw), field) {
+			t.Fatalf("JSON %s missing %s", raw, field)
+		}
+	}
+	if text := formatListText(result.Formats); !strings.Contains(text, "inventory only; not executed") {
+		t.Fatalf("human output obscures trust boundary: %q", text)
 	}
 }
 

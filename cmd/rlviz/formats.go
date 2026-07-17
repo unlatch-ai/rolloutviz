@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/unlatch-ai/rlviz/internal/model"
@@ -11,30 +12,45 @@ import (
 )
 
 type formatInfo struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	Source       string   `json:"source"`
-	Kind         string   `json:"kind"`
-	APIVersion   string   `json:"api_version"`
-	Version      string   `json:"version,omitempty"`
-	Status       string   `json:"status"`
-	Path         string   `json:"path,omitempty"`
-	Digest       string   `json:"digest,omitempty"`
-	Capabilities []string `json:"capabilities,omitempty"`
-	Description  string   `json:"description,omitempty"`
-	Error        string   `json:"error,omitempty"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Source          string   `json:"source"`
+	Kind            string   `json:"kind"`
+	APIVersion      string   `json:"api_version"`
+	Version         string   `json:"version,omitempty"`
+	Status          string   `json:"status"`
+	Path            string   `json:"path,omitempty"`
+	Digest          string   `json:"digest,omitempty"`
+	Capabilities    []string `json:"capabilities,omitempty"`
+	Description     string   `json:"description,omitempty"`
+	Error           string   `json:"error,omitempty"`
+	Rank            int      `json:"rank,omitempty"`
+	DiscoverySource string   `json:"discovery_source,omitempty"`
 }
 
 type formatsResult struct {
-	Formats []formatInfo `json:"formats"`
+	SchemaVersion   int                      `json:"schema_version"`
+	Formats         []formatInfo             `json:"formats"`
+	DiscoveryIssues []plugins.DiscoveryIssue `json:"discovery_issues"`
+}
+
+type repeatedPaths []string
+
+func (paths *repeatedPaths) String() string { return strings.Join(*paths, ",") }
+func (paths *repeatedPaths) Set(value string) error {
+	*paths = append(*paths, value)
+	return nil
 }
 
 func runFormats(arguments []string) {
 	flags := flag.NewFlagSet("formats", flag.ExitOnError)
 	jsonOutput := flags.Bool("json", false, "print machine-readable output")
+	project := flags.String("project", ".", "project directory whose .rlviz/plugins directory may be inventoried")
+	var extraRoots repeatedPaths
+	flags.Var(&extraRoots, "plugin-root", "additional explicit plugin directory to inventory (repeatable)")
 	_ = flags.Parse(arguments)
 	if flags.NArg() != 0 {
-		fmt.Fprintln(flags.Output(), "Usage: rlviz formats [--json]")
+		fmt.Fprintln(flags.Output(), "Usage: rlviz formats [--json] [--project DIR] [--plugin-root DIR]...")
 		os.Exit(2)
 	}
 	store, err := plugins.DefaultTrustStore()
@@ -45,18 +61,29 @@ func runFormats(arguments []string) {
 	if err != nil {
 		fatalError("formats", *jsonOutput, err)
 	}
-	result := collectFormats(entries)
+	roots := make([]plugins.DiscoveryRoot, 0, len(extraRoots)+2)
+	for _, root := range extraRoots {
+		roots = append(roots, plugins.DiscoveryRoot{Path: root, Source: "explicit"})
+	}
+	roots = append(roots,
+		plugins.DiscoveryRoot{Path: filepath.Join(*project, ".rlviz", "plugins"), Source: "project"},
+		plugins.DiscoveryRoot{Path: filepath.Join(filepath.Dir(store.Path), "plugins"), Source: "user"},
+	)
+	discovery := plugins.Discover(plugins.DiscoveryOptions{Roots: roots, TrustEntries: entries})
+	result := collectFormats(entries, discovery)
 	writeOutput(result, *jsonOutput, formatListText(result.Formats))
 }
 
-func collectFormats(entries []plugins.TrustEntry) formatsResult {
+func collectFormats(entries []plugins.TrustEntry, discoveries ...plugins.DiscoveryResult) formatsResult {
 	formats := []formatInfo{{
 		ID: "canonical-ndjson", Name: "Canonical NDJSON", Source: "built_in",
 		Kind: "Adapter", APIVersion: model.APIVersion, Status: "available",
 		Capabilities: []string{"adapter.stream", "groups", "artifacts", "source-provenance"},
 		Description:  "Versioned newline-delimited RLViz canonical records",
 	}}
+	knownPaths := map[string]int{}
 	for _, entry := range entries {
+		pathKey := cleanFormatPath(entry.Path)
 		info := formatInfo{
 			ID: entry.Path, Name: entry.Path, Source: "trusted_plugin", Kind: "Plugin",
 			Status: "unavailable", Path: entry.Path, Digest: entry.Digest,
@@ -81,8 +108,39 @@ func collectFormats(entries []plugins.TrustEntry) formatsResult {
 			info.Error = "plugin contents changed since trust was granted"
 		}
 		formats = append(formats, info)
+		knownPaths[pathKey] = len(formats) - 1
 	}
-	return formatsResult{Formats: formats}
+	issues := []plugins.DiscoveryIssue{}
+	for _, discovery := range discoveries {
+		issues = append(issues, discovery.Issues...)
+		for _, item := range discovery.Plugins {
+			if index, exists := knownPaths[cleanFormatPath(item.Path)]; exists {
+				formats[index].Rank = item.Rank
+				formats[index].DiscoverySource = item.Source
+				continue
+			}
+			formats = append(formats, formatInfo{
+				ID: item.Name, Name: item.Name, Source: item.Source + "_plugin", Kind: item.Kind,
+				APIVersion: item.APIVersion, Version: item.Version, Status: item.Status,
+				Path: item.Path, Digest: item.Digest, Capabilities: item.Capabilities,
+				Description: item.Description, Error: item.Error, Rank: item.Rank,
+				DiscoverySource: item.Source,
+			})
+			knownPaths[cleanFormatPath(item.Path)] = len(formats) - 1
+		}
+	}
+	return formatsResult{SchemaVersion: 1, Formats: formats, DiscoveryIssues: issues}
+}
+
+func cleanFormatPath(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.Clean(path)
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		return resolved
+	}
+	return filepath.Clean(abs)
 }
 
 func formatListText(formats []formatInfo) string {
@@ -93,9 +151,16 @@ func formatListText(formats []formatInfo) string {
 		}
 	}
 	trusted := make([]string, 0)
+	discovered := make([]string, 0)
 	for _, format := range formats {
-		if format.Source != "built_in" {
+		if format.Source == "trusted_plugin" {
 			trusted = append(trusted, fmt.Sprintf("  %s  %s  %s", format.ID, format.Kind, format.Status))
+		} else if format.Source != "built_in" {
+			name := format.ID
+			if name == "" {
+				name = filepath.Base(format.Path)
+			}
+			discovered = append(discovered, fmt.Sprintf("  %d  %s  %s  %s", format.Rank, name, format.Source, format.Status))
 		}
 	}
 	if len(trusted) == 0 {
@@ -103,6 +168,12 @@ func formatListText(formats []formatInfo) string {
 	} else {
 		lines = append(lines, "", "Trusted plugins:")
 		lines = append(lines, trusted...)
+	}
+	if len(discovered) == 0 {
+		lines = append(lines, "", "Discovered plugin manifests:", "  none")
+	} else {
+		lines = append(lines, "", "Discovered plugin manifests (inventory only; not executed):")
+		lines = append(lines, discovered...)
 	}
 	lines = append(lines, "", "Example adapters are not built-in formats. See docs/supported-formats.md.")
 	return strings.Join(lines, "\n")

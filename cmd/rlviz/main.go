@@ -639,7 +639,7 @@ Usage:
   rlviz status [--json]
   rlviz stop [--json]
   rlviz doctor [--json]
-  rlviz formats [--json]
+  rlviz formats [--json] [--project DIR] [--plugin-root DIR]...
   rlviz inspect [--json] [--adapter PATH] SOURCE
   rlviz setup agent <codex|claude-code|cursor> (--print | --dry-run --destination PATH | --write --destination PATH) [--json]
   rlviz cache <status|clean>

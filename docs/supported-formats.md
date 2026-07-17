@@ -31,9 +31,11 @@ adapters. Today an adapter is selected explicitly:
 rlviz open SOURCE --adapter .rlviz/plugins/my-format
 ```
 
-Adapter discovery and bounded automatic probing are future work. Until they are
-implemented, documentation and CLI output must not imply that RLViz natively
-recognizes arbitrary JSON, databases, directories, or vendor formats.
+`rlviz formats` discovers bounded manifest metadata from project and user plugin
+directories. This inventory does not execute probes, select an adapter, or grant
+trust. Bounded automatic probing remains future work. Documentation and CLI
+output must not imply that RLViz natively recognizes arbitrary JSON, databases,
+directories, or vendor formats.
 
 ## Format-support policy
 
@@ -55,7 +57,8 @@ format detection without starting the daemon or browser. An explicit adapter
 must already be trusted; inspection invokes its `probe` operation but never
 `stream`.
 
-`rlviz formats [--json]` generates its output from the built-in decoder and
-current trust store. It reports unavailable and digest-changed plugin entries
-without executing them. Future adapter discovery will extend the same result
-instead of creating a separate format registry.
+`rlviz formats [--json] [--project DIR] [--plugin-root DIR]...` generates a
+schema-versioned inventory from the built-in decoder, current trust store, and
+bounded manifest discovery. It reports unavailable, digest-changed, untrusted,
+and invalid entries without executing them. Discovery rank reflects only the
+documented root and path order; it is not a compatibility score.

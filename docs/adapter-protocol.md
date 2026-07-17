@@ -6,17 +6,20 @@ Adapters translate source-specific trace formats into RLViz's canonical model. T
 
 Coding agents can generate adapters by inspecting representative source records, implementing this protocol, and running the conformance validator.
 
-## Planned discovery
+## Manifest discovery
 
-RLViz discovers adapters in this order:
+`rlviz formats` inventories manifests, in deterministic order, from:
 
-1. Explicit `--adapter`
-2. Project-local `.rlviz/plugins`
-3. User plugins under the platform configuration directory
-4. `rlviz-adapter-*` executables on `PATH`
-5. Built-in adapters
+1. Repeated explicit `--plugin-root` directories
+2. Project-local `.rlviz/plugins` (override the project with `--project`)
+3. User plugins under the RLViz platform configuration directory
 
-The current slice requires explicit `--adapter`. Automatic discovery will use this order. External plugins include a manifest:
+This is a read-only inventory, not automatic adapter selection. Discovery reads
+and validates bounded manifest metadata, but never runs `probe`, executes plugin
+code, searches `PATH`, or grants trust. A discovered executable adapter must
+still be explicitly selected with `--adapter` and approved with `plugin trust`.
+
+External plugins include a manifest:
 
 ```yaml
 api_version: rlviz.dev/v1alpha1
@@ -129,3 +132,10 @@ Adapters are executable code. RLViz records trust by absolute plugin path and co
 Each execution uses a private snapshot whose digest must still match the approved code. Python bytecode and imported helpers are part of that digest. Adapter stdout is currently capped at 32 MiB and stderr at 1 MiB.
 
 Project repositories may commit adapter code and manifests, but opening the repository does not automatically trust them.
+
+Manifest inventory is bounded to two directory levels, 128 manifests, 4,096
+entries per directory, and 256 KiB per manifest. Directory symlinks and manifest
+symlinks are not followed. `rlviz formats --json` exposes schema-versioned
+inventory results, deterministic ranks, trust state (`trusted`, `changed`,
+`untrusted`, or `invalid`), and root diagnostics. Only already-trusted plugin
+trees are content-hashed to determine whether their approved digest changed.
