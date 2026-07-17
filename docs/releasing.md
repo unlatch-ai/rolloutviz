@@ -9,21 +9,18 @@ artifact attestations, and attaches a generated Homebrew formula.
 
 ### Homebrew
 
-1. Create the public repository `unlatch-ai/homebrew-tap` with a `main` branch.
-2. Create a fine-grained GitHub token limited to that repository with
-   `Contents: read and write`.
-3. Store it in the RolloutViz repository secret `TAP_GITHUB_TOKEN`.
-
-Without the secret, native release publication still succeeds and the formula
-remains attached to the GitHub release. The Homebrew job reports that it skipped
-the tap update.
+The public `unlatch-ai/homebrew-tap` repository polls the latest RolloutViz
+release hourly and commits an updated attached formula with its repository-local
+`GITHUB_TOKEN`. No cross-repository token is required. A maintainer can also run
+the tap's `sync rolloutviz` workflow manually after a release.
 
 ### npm
 
-The npm package is an optional installer for the same native archives. Follow
-the bootstrap steps in [`packages/npm/README.md`](../packages/npm/README.md).
-Until the npm trusted publisher is configured and the repository variable
-`NPM_PUBLISH_ENABLED` equals `true`, the npm job is skipped.
+The npm package is an optional installer for the same native archives. Its
+trusted publisher is configured for `.github/workflows/release.yml`, and the
+repository variable `NPM_PUBLISH_ENABLED` enables the job. Recovery and
+re-bootstrap steps live in
+[`packages/npm/README.md`](../packages/npm/README.md).
 
 ## Publish
 

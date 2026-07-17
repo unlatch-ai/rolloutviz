@@ -46,31 +46,6 @@ jobs:
           gh release upload "${GITHUB_REF_NAME}" dist/rolloutviz.rb --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  homebrew:
-    needs: release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Update Homebrew tap
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
-        run: |
-          if [ -z "${TAP_GITHUB_TOKEN}" ]; then
-            echo "TAP_GITHUB_TOKEN is not configured; formula remains attached to the release"
-            exit 0
-          fi
-          mkdir -p /tmp/formula
-          gh release download "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --pattern rolloutviz.rb --dir /tmp/formula
-          git clone "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/unlatch-ai/homebrew-tap.git" /tmp/homebrew-tap
-          mkdir -p /tmp/homebrew-tap/Formula
-          cp /tmp/formula/rolloutviz.rb /tmp/homebrew-tap/Formula/rolloutviz.rb
-          git -C /tmp/homebrew-tap config user.name github-actions[bot]
-          git -C /tmp/homebrew-tap config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git -C /tmp/homebrew-tap add Formula/rolloutviz.rb
-          if ! git -C /tmp/homebrew-tap diff --cached --quiet; then
-            git -C /tmp/homebrew-tap commit -m "rolloutviz ${GITHUB_REF_NAME}"
-            git -C /tmp/homebrew-tap push origin HEAD:main
-          fi
   npm:
     needs: release
     if: ${{ vars.NPM_PUBLISH_ENABLED == 'true' }}

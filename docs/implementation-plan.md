@@ -162,11 +162,10 @@ Milestones 0–7 are implemented in the repository: versioned contracts and fixt
 
 ## Near-term issue sequence
 
-1. Add a narrow tap-update token so future tags update Homebrew automatically.
-2. Validate the clean-machine install-to-open path on Linux; macOS curl, Homebrew, and npm paths are verified.
-3. Gather real adapter fixtures from environment and post-training workflows.
-4. Profile larger rollout groups and tune the existing event, signal, and artifact cursors.
-5. Extend comparison sets across sources, runs, and checkpoints after the local single-source workflow is proven.
+1. Validate the clean-machine install-to-open path on Linux; macOS curl, Homebrew, and npm paths are verified.
+2. Gather real adapter fixtures from environment and post-training workflows.
+3. Profile larger rollout groups and tune the existing event, signal, and artifact cursors.
+4. Extend comparison sets across sources, runs, and checkpoints after the local single-source workflow is proven.
 
 ## Quality gates
 
