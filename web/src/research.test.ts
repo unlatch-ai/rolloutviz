@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sampleTrajectory } from "./sample";
-import { artifactsForEvent, deriveLandmark, deriveMessage, deriveOutcome, deriveTokenTotals, deriveTool, findingsForEvent, groupTranscript, isContextEvent, linkedEventIds } from "./research";
+import { artifactsForEvent, deriveLandmark, deriveLandmarkRail, deriveMessage, deriveOutcome, deriveTokenTotals, deriveTool, findingsForEvent, groupTranscript, isContextEvent, linkedEventIds } from "./research";
 import type { AnalyzerFinding, Trajectory, TrajectoryArtifact, TrajectoryEvent, TrajectorySignal } from "./types";
 
 describe("research view derivation", () => {
@@ -33,6 +33,40 @@ describe("research view derivation", () => {
     const compaction: TrajectoryEvent = { id: "compact", sequence: 3, kind: "state", title: "Context compacted", alignment_key: "context:compaction" };
     expect(isContextEvent(compaction)).toBe(true);
     expect(deriveLandmark(compaction)).toMatchObject({ category: "context", label: "Context compacted", provenance: "source-native" });
+  });
+
+  it("selects sparse landmark reasons with stable precedence and ordering", () => {
+    const events: TrajectoryEvent[] = [
+      { id: "last", sequence: 9, kind: "generation", output: { role: "assistant", content: "done" } },
+      { id: "context", sequence: 4, kind: "state", context: { operation: "compaction", provenance: "source_native" } },
+      { id: "tool", sequence: 3, kind: "tool", title: "read_file" },
+      { id: "user", sequence: 2, kind: "message", input: { role: "user", content: "fix it" } },
+      { id: "start", sequence: 1, kind: "generation", content: "planning" },
+      { id: "error", sequence: 5, kind: "error" },
+      { id: "reward", sequence: 6, kind: "reward" },
+    ];
+    const rail = deriveLandmarkRail(
+      events,
+      [{ id: "artifact", trajectory_id: "t", event_id: "context", media_type: "text/plain" }, { id: "global", trajectory_id: "t", media_type: "text/plain" }],
+      [{ id: "finding", trajectory_id: "t", event_ids: ["context", "tool", "missing"], kind: "retry", severity: "warning", title: "Retry" }],
+      [{ id: "signal", trajectory_id: "t", event_id: "tool", name: "score", value: 1 }],
+      { selectedId: "last", complete: true },
+    );
+    expect(rail.map(({ eventId, reason }) => [eventId, reason])).toEqual([
+      ["start", "start"],
+      ["user", "turn"],
+      ["tool", "finding"],
+      ["context", "context"],
+      ["error", "failure"],
+      ["reward", "evaluation"],
+      ["last", "end"],
+    ]);
+  });
+
+  it("withholds a terminal landmark for incomplete streams and injects only the selection", () => {
+    const events = Array.from({ length: 10_000 }, (_, index): TrajectoryEvent => ({ id: `event-${index}`, sequence: index, kind: "generation" }));
+    const rail = deriveLandmarkRail(events, [], [], [], { selectedId: "event-5431", complete: false });
+    expect(rail.map(({ eventId, reason }) => [eventId, reason])).toEqual([["event-0", "start"], ["event-5431", "selected"]]);
   });
 
   it("prefers structured context semantics while retaining legacy landmarks", () => {

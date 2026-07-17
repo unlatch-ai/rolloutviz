@@ -176,6 +176,7 @@ kbd { display: inline-block; min-width: 17px; padding: 1px 4px; border: 1px soli
 .event-outline { overflow: auto; }
 .outline-virtual button { width: 100%; height: 47px; display: grid; grid-template-columns: 23px minmax(0,1fr) 20px; align-items: center; gap: 7px; padding: 5px 8px; border: 0; border-left: 2px solid transparent; background: transparent; text-align: left; cursor: pointer; }
 .outline-virtual button:hover { background: #14181d; }
+.outline-virtual button.pinned:not(.active) { border-left-color: #59636f; background: #11161b; }
 .outline-virtual button.active { border-left-color: var(--teal); background: #15201e; }
 .outline-text { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .outline-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c0c8d1; font-size: 10px; font-weight: 590; }

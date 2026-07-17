@@ -1,5 +1,6 @@
 import type {
   AnalyzerFinding,
+  AnalyzerSignal,
   Trajectory,
   TrajectoryArtifact,
   TrajectoryEvent,
@@ -38,6 +39,12 @@ export interface SemanticLandmark {
   category: LandmarkCategory;
   label: string;
   provenance: SemanticProvenance;
+}
+
+export type LandmarkRailReason = "context" | "failure" | "evaluation" | "finding" | "signal" | "artifact" | "turn" | "prompt" | "end" | "start" | "selected";
+
+export interface LandmarkRailItem extends SemanticLandmark {
+  reason: LandmarkRailReason;
 }
 
 export interface TranscriptGroup {
@@ -186,6 +193,42 @@ export function deriveLandmark(event: TrajectoryEvent): SemanticLandmark {
     label: nativeLabel || defaultLandmarkLabel(event, category),
     provenance: category === "context" ? contextLandmarkProvenance(event) : nativeLabel ? "source-native" : "inferred",
   };
+}
+
+const landmarkReasonPriority: LandmarkRailReason[] = ["context", "failure", "evaluation", "finding", "signal", "artifact", "turn", "prompt", "end", "start", "selected"];
+
+/** Select sparse, source-backed navigation anchors without hiding raw events. */
+export function deriveLandmarkRail(events: TrajectoryEvent[], artifacts: TrajectoryArtifact[] = [], findings: AnalyzerFinding[] = [], signals: Array<TrajectorySignal | AnalyzerSignal> = [], options: { selectedId?: string; complete?: boolean } = {}): LandmarkRailItem[] {
+  const ordered = stableEvents(events);
+  if (!ordered.length) return [];
+  const loaded = new Map(ordered.map((event) => [event.id, event]));
+  const reasons = new Map<string, LandmarkRailReason>();
+  const include = (eventId: string | undefined, reason: LandmarkRailReason) => {
+    if (!eventId || !loaded.has(eventId)) return;
+    const current = reasons.get(eventId);
+    if (!current || landmarkReasonPriority.indexOf(reason) < landmarkReasonPriority.indexOf(current)) reasons.set(eventId, reason);
+  };
+
+  include(ordered[0].id, "start");
+  if (options.complete) include(ordered.at(-1)?.id, "end");
+  for (const event of ordered) {
+    const role = deriveMessage(event)?.role?.value;
+    if (role === "user") include(event.id, "turn");
+    else if (role === "system" || role === "developer") include(event.id, "prompt");
+    if (isContextEvent(event)) include(event.id, "context");
+    else if (event.kind === "error") include(event.id, "failure");
+    else if (event.kind === "grader" || event.kind === "reward") include(event.id, "evaluation");
+    else if (event.kind === "artifact") include(event.id, "artifact");
+  }
+  for (const finding of findings) for (const eventId of finding.event_ids ?? []) include(eventId, "finding");
+  for (const signal of signals) include(signal.event_id, "signal");
+  for (const artifact of artifacts) include(artifact.event_id, "artifact");
+  include(options.selectedId, "selected");
+
+  return ordered.flatMap((event) => {
+    const reason = reasons.get(event.id);
+    return reason ? [{ ...deriveLandmark(event), reason }] : [];
+  });
 }
 
 function stableEvents(events: TrajectoryEvent[]): TrajectoryEvent[] {

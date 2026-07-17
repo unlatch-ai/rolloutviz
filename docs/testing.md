@@ -57,6 +57,9 @@ Whole-trajectory overview tests assert deterministic aggregation, partial loaded
 extent, viewport and selection positions, filtered nearest-event navigation, and
 a constant 192-cell ceiling for 10,000-event runs. Virtual-list tests keep the
 reported viewport independent from overscan and forced selected-row rendering.
+Landmark-rail tests assert stable reason precedence, no premature endpoint for
+partial indexes, bounded rendering on 10,000 events, raw-event keyboard
+navigation, and pinned selection when filters exclude the current event.
 
 ### Real-browser end-to-end tests
 

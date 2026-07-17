@@ -215,10 +215,10 @@ manifest and path-safe runner that delegates to the trusted Go validator.
 ## Milestone 10: research-grade trajectory reader
 
 Status: transcript, event timeline, outcome/evidence, selected-event-first
-details, semantic landmarks, sparse source-backed context track, context-change
-jump, long-run virtualization, and a bounded whole-trajectory activity overview
-are implemented. Broader real-format context evidence remains ongoing quality
-work.
+details, a sparse semantic landmark rail with raw-result fallback, a source-backed
+context track, context-change jump, long-run virtualization, and a bounded
+whole-trajectory activity overview are implemented. Broader real-format context
+evidence remains ongoing quality work.
 
 ### Deliverables
 
@@ -267,8 +267,7 @@ trajectory API. Broader inspector and keymap customization remains.
 
 1. Validate the Inspect AI and Verifiers mappings against additional upstream
    samples as their public contracts evolve.
-2. Prune the event outline into a semantic landmark rail while keeping raw event
-   access in the timeline and whole-run activity in the overview.
+2. Validate landmark density and labeling on longer real research traces.
 3. Extend safe declarative customization to inspector sections and portable
    keymaps without allowing arbitrary viewer code.
 4. Validate the clean-machine install-to-open path on Linux; macOS curl,

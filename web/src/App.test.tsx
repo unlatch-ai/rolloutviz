@@ -129,7 +129,7 @@ describe("trajectory navigation", () => {
   it("bounds rendered nodes for 10,000 events and mounts keyboard-selected events", () => {
     const { container } = render(<App initialTrajectory={largeTrajectory} />);
     expect(container.querySelectorAll(".transcript-entry").length).toBeLessThan(30);
-    expect(container.querySelectorAll(".outline-virtual button").length).toBeLessThan(30);
+    expect(container.querySelectorAll(".outline-virtual button")).toHaveLength(2);
     expect(container.querySelectorAll(".overview-lane i")).toHaveLength(192);
 
     fireEvent.keyDown(window, { key: "e" });
@@ -137,13 +137,25 @@ describe("trajectory navigation", () => {
     expect(container.querySelector("#event-large-9999")).toHaveClass("selected");
     expect(container.querySelector('.outline-virtual button[aria-current="true"]')).toHaveTextContent("Event 10000");
     expect(container.querySelectorAll(".transcript-entry").length).toBeLessThan(30);
-    expect(container.querySelectorAll(".outline-virtual button").length).toBeLessThan(30);
+    expect(container.querySelectorAll(".outline-virtual button")).toHaveLength(2);
+  });
+
+  it("keeps raw event keyboard navigation while the default rail stays sparse", () => {
+    const { container } = render(<App initialTrajectory={largeTrajectory} />);
+    expect(container.querySelectorAll(".outline-virtual button")).toHaveLength(2);
+    fireEvent.keyDown(window, { key: "j" });
+    expect(screen.getByText("Event 2", { selector: ".selected-heading h3" })).toBeInTheDocument();
+    expect(container.querySelectorAll(".outline-virtual button")).toHaveLength(3);
+    expect(container.querySelector('.outline-virtual button[aria-current="true"]')).toHaveTextContent("selected");
   });
 
   it("keeps filtered results selectable without rendering the full trajectory", () => {
     const { container } = render(<App initialTrajectory={largeTrajectory} />);
     const search = screen.getByLabelText("Search events");
     fireEvent.change(search, { target: { value: "Event 5432" } });
+    expect(screen.getByText("Results", { selector: ".panel-heading span" })).toBeInTheDocument();
+    expect(screen.getByText(/outside filter/, { selector: ".outline-text small" })).toBeInTheDocument();
+    expect(container.querySelectorAll(".outline-virtual button")).toHaveLength(2);
     const result = screen.getByText("Event 5432", { selector: ".outline-text b" });
     fireEvent.click(result);
     expect(screen.getByText("Event 5432", { selector: ".selected-heading h3" })).toBeInTheDocument();

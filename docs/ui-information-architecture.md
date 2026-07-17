@@ -147,6 +147,14 @@ viewport, and selected-event position across at most 64 bins. Unloaded space is
 explicitly unavailable. Context evidence remains in the context track; the
 overview does not duplicate individual landmarks or infer missing events.
 
+The landmark rail is sparse by default. It includes source-backed prompts and
+turns, context lifecycle events, failures, evaluations, artifacts, analyzer
+references, loaded endpoints, and the current selection. Tool titles and payload
+text alone do not promote an event. Search or kind filtering changes the rail to
+Results and shows every raw match; a selected event outside the filter remains
+pinned for orientation. Raw events remain available in transcript/timeline
+surfaces, deep links, and `j`/`k` navigation.
+
 ## Details panel
 
 The selected turn or event comes first. Event-linked artifacts and verifier

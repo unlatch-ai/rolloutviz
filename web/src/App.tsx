@@ -10,7 +10,7 @@ import { duration, eventText, json, payload, preview, time, title } from "./form
 import { GroupView } from "./GroupView";
 import { KeymapDialog } from "./KeymapDialog";
 import { applyPresentationTheme } from "./presentation";
-import { deriveLandmark, isContextEvent } from "./research";
+import { deriveLandmark, deriveLandmarkRail, isContextEvent } from "./research";
 import { OutcomeView, TranscriptView } from "./ResearchViews";
 import { sampleTrajectory } from "./sample";
 import { TrajectoryTabs } from "./TrajectoryTabs";
@@ -303,7 +303,22 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
   const selected = trajectory.events.find((event) => event.id === selectedId) || visible[0] || trajectory.events[0];
   const selectedVisibleIndex = visible.findIndex((event) => event.id === selected.id);
   const analysisEventIds = useMemo(() => [...new Set((analysis?.analysis.findings ?? []).flatMap((finding) => finding.event_ids ?? []))], [analysis]);
-  const landmarks = useMemo(() => new Map(trajectory.events.map((event) => [event.id, deriveLandmark(event)])), [trajectory.events]);
+  const resultsActive = filter !== "all" || query.length > 0;
+  const railEntries = useMemo(() => {
+    if (resultsActive) {
+      const entries: Array<{ event: TrajectoryEvent; landmark: ReturnType<typeof deriveLandmark>; reason: string; pinned: boolean }> = visible.map((event) => ({ event, landmark: deriveLandmark(event), reason: "result", pinned: false }));
+      if (!visible.some((event) => event.id === selected.id)) entries.unshift({ event: selected, landmark: deriveLandmark(selected), reason: "outside filter", pinned: true });
+      return entries;
+    }
+    const byID = new Map(trajectory.events.map((event) => [event.id, event]));
+    const complete = indexSource === null || indexSource.index_state === "complete";
+    return deriveLandmarkRail(trajectory.events, trajectory.artifacts ?? [], analysis?.analysis.findings ?? [], [...(trajectory.signals ?? []), ...(analysis?.analysis.signals ?? [])], { selectedId: selected.id, complete })
+      .flatMap((landmark) => {
+        const event = byID.get(landmark.eventId);
+        return event ? [{ event, landmark, reason: landmark.reason.replaceAll("_", " "), pinned: landmark.reason === "selected" }] : [];
+      });
+  }, [analysis, indexSource, resultsActive, selected, trajectory.artifacts, trajectory.events, trajectory.signals, visible]);
+  const selectedRailIndex = railEntries.findIndex(({ event }) => event.id === selected.id);
 
   const selectEvent = (id: string) => {
     if (!trajectory.events.some((event) => event.id === id)) return;
@@ -422,11 +437,11 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
       </div>
       <div className="workspace">
         <aside className="outline">
-          <div className="panel-heading"><span>Events</span><span>{visible.length}/{trajectory.events.length}</span></div>
-          <div className={`search ${searchOpen ? "open" : ""}`}><span>⌕</span><input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events" aria-label="Search events" /><kbd>{bindingLabel(commandIds.trajectory.search)}</kbd></div>
+          <div className="panel-heading"><span>{resultsActive ? "Results" : "Landmarks"}</span><span>{resultsActive ? visible.length : railEntries.length} · {trajectory.events.length < eventTotal ? `${trajectory.events.length}/${eventTotal}` : trajectory.events.length} events</span></div>
+          <div className={`search ${searchOpen ? "open" : ""}`}><span>⌕</span><input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search all events" aria-label="Search events" /><kbd>{bindingLabel(commandIds.trajectory.search)}</kbd></div>
           <div className="filters">{filterKinds.filter((kind) => kind === "all" || counts[kind]).map((kind) => <button key={kind} className={filter === kind ? "active" : ""} onClick={() => setFilter(kind)}><span>{kind}</span><b>{kind === "all" ? trajectory.events.length : counts[kind]}</b></button>)}</div>
-          <nav ref={outlineRef} className="event-outline" aria-label="Trajectory landmarks">
-            <VirtualList items={visible} estimateSize={47} overscan={6} selectedIndex={selectedVisibleIndex} scrollRef={outlineRef} className="outline-virtual" itemKey={eventKey} renderItem={(event, index) => { const landmark = landmarks.get(event.id); return <button className={selected.id === event.id ? "active" : ""} aria-current={selected.id === event.id ? "true" : undefined} aria-posinset={index + 1} aria-setsize={visible.length} onClick={() => selectEvent(event.id)}><Kind kind={event.kind} /><span className="outline-text"><b>{landmark?.label ?? title(event)}</b><small>{landmark?.category ?? event.kind} · {duration(event.duration_ms)}</small></span><span className="outline-seq">{event.sequence}</span></button>; }} />
+          <nav ref={outlineRef} className="event-outline" aria-label={resultsActive ? "Trajectory search results" : "Trajectory landmarks"}>
+            <VirtualList items={railEntries} estimateSize={47} overscan={6} selectedIndex={selectedRailIndex} scrollRef={outlineRef} className="outline-virtual" itemKey={({ event }) => event.id} renderItem={({ event, landmark, reason, pinned }, index) => <button className={`${selected.id === event.id ? "active" : ""} ${pinned ? "pinned" : ""}`} aria-current={selected.id === event.id ? "true" : undefined} aria-posinset={index + 1} aria-setsize={railEntries.length} onClick={() => selectEvent(event.id)}><Kind kind={event.kind} /><span className="outline-text"><b>{landmark.label ?? title(event)}</b><small>{reason} · {landmark.category}</small></span><span className="outline-seq">{event.sequence}</span></button>} />
           </nav>
           {!visible.length && <div className="no-results">No matching events</div>}
         </aside>

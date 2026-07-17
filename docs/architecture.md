@@ -163,7 +163,11 @@ The React application has three levels of research surfaces:
 - `AnalysisPanel.tsx` and `ArtifactPanel.tsx`: derived findings and artifacts
 
 `research.ts` derives conservative, provenance-labeled display semantics from
-canonical records. `commands.ts` is the single command/keymap registry.
+canonical records. Its pure `deriveLandmarkRail` selector keeps only source-backed
+turns, prompts, context changes, failures, evaluations, artifacts, analyzer
+references, endpoints, and the current selection. Filtering switches the rail
+to raw matching events without changing canonical event navigation.
+`commands.ts` is the single command/keymap registry.
 `api.ts` is the typed daemon client, `types.ts` mirrors API records, and
 `VirtualList.tsx` bounds DOM work for long lists while reporting the exact
 non-overscanned viewport to the overview. Structured context observations
