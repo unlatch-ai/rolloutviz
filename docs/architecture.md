@@ -1,143 +1,180 @@
-# Architecture
+# System architecture
 
-## Overview
+This document is the current structural map of RLViz. It describes what exists
+in the repository today, the boundaries that must remain stable, and the main
+request paths. Product intent lives in `product-spec.md`; target UI behavior
+lives in `ui-information-architecture.md`.
 
-RLViz ships as one Go binary with an embedded browser UI.
+## Product shape
 
-```text
-CLI
- ├── daemon client
- ├── plugin commands
- └── machine-readable diagnostics
-         │
-         ▼
-Local daemon on 127.0.0.1
- ├── source registry
- ├── adapter host
- ├── canonical event stream
- ├── index and cache
- ├── artifact access policy
- └── embedded web server
-         │
-         ▼
-React UI
- ├── trajectory timeline
- ├── event inspector
- ├── group overview
- └── comparison views
-```
-
-## Technology choices
-
-### Go core
-
-Go provides straightforward cross-compilation, a small deployment surface, strong streaming and concurrency support, and a practical implementation target for coding agents.
-
-### React and TypeScript UI
-
-The viewer requires virtualized timelines, structured payload rendering, keyboard interaction, artifacts, and eventual comparison views. The built frontend is embedded with Go's `embed` package.
-
-### SQLite index
-
-SQLite stores normalized metadata, event indexes, search fields, and cache provenance. Raw source payloads remain in their original files and are read by source location where practical.
-
-Use a pure-Go SQLite driver unless profiling proves that CGO is necessary.
-
-### Process plugins
-
-Adapters and analyzers run as subprocesses over a versioned JSON/NDJSON protocol. Do not use Go's native plugin mechanism because it is compiler-version-sensitive and not portable across all target platforms.
-
-## Proposed repository structure
+RLViz is one native Go binary with an embedded React application. It reads
+existing rollout artifacts, normalizes them into a versioned canonical model,
+indexes them locally, and serves a private browser UI from loopback.
 
 ```text
-cmd/rlviz/        CLI entrypoint
-internal/app/          command orchestration
-internal/cli/          arguments and output contracts
-internal/daemon/       background-process lifecycle
-internal/model/        canonical rollout types
-internal/adapters/     built-in adapters and detection
-internal/plugins/      manifests, discovery, trust, protocol host
-internal/alignment/    fingerprints, sequence alignment, divergence
-internal/index/        SQLite index and cache provenance
-internal/server/       local HTTP API and embedded assets
-internal/security/     path and origin validation
-web/                   React application
-schemas/               versioned machine-readable contracts
-fixtures/              small public test trajectories
-integrations/          coding-agent skills and rules
-docs/                  product and engineering documentation
+coding agent or human
+        |
+        v
+rlviz CLI --------------------------------------------------+
+  open / status / stop / doctor / cache / plugin            |
+        |                                                    |
+        v                                                    |
+background daemon on 127.0.0.1                              |
+  authenticated source registry                              |
+  canonical decoder or trusted process adapter               |
+  progressive SQLite index + source provenance               |
+  deterministic analyzers + comparison engine                |
+  embedded HTTP API and React assets                          |
+        |                                                    |
+        v                                                    |
+browser viewer                                                |
+  trajectory / group / compact paths / pair comparison       |
+  event details / artifacts / analyzer findings              |
+                                                             |
+source files <---------- always read-only -------------------+
 ```
 
-## Daemon lifecycle
+The binary contains no model and does not execute recorded tools. Coding agents
+operate the CLI and can author project-local adapters; RLViz remains the viewer.
 
-`rlviz open` must return promptly when invoked by a coding agent.
+## Repository map
+
+| Path | Responsibility |
+| --- | --- |
+| `cmd/rlviz` | CLI parsing, human and JSON output, daemon and plugin commands |
+| `internal/model` | Canonical v1alpha1 records, decoding, validation, schema conformance |
+| `internal/app` | Source loading, progressive indexing, refresh orchestration |
+| `internal/daemon` | Detached process lifecycle, metadata, authentication token, private runtime paths |
+| `internal/index` | SQLite schema, bounded writes, queries, metrics, analyzer cache |
+| `internal/plugins` | Manifest validation, trust store, verified snapshots, adapter/analyzer process host |
+| `internal/analyzers` | Built-in deterministic findings and analyzer protocol |
+| `internal/alignment` | Behavioral fingerprints, compact paths, deterministic pair alignment |
+| `internal/server` | Loopback API, source registry, artifact policy, embedded UI routes |
+| `internal/watch` | Growing-file and replacement detection |
+| `web/src` | React viewer and typed API client |
+| `web/dist` | Generated production UI embedded by `web/embed.go` |
+| `schemas/v1alpha1` | Public canonical and plugin contracts |
+| `fixtures` | Canonical, malformed, adversarial, and protocol conformance data |
+| `examples` | Runnable adapters and public example traces |
+| `integrations` | Codex, Claude Code, and Cursor project instructions |
+| `docs/adr` | Durable architectural decisions and their tradeoffs |
+
+## Runtime paths
+
+### Open a source
 
 ```text
-rlviz open PATH
-  -> read daemon metadata
-  -> start a detached daemon when absent
-  -> authenticate to the loopback daemon with a local token
-  -> register PATH and adapter selection
-  -> receive a viewer URL
-  -> open the system browser
-  -> print structured result and exit
+rlviz open SOURCE
+  1. resolve the source path without modifying it
+  2. load or start the per-user daemon
+  3. send an authenticated registration request
+  4. choose the canonical decoder or an explicitly trusted adapter
+  5. validate and commit the first bounded record batch
+  6. return an authenticated viewer URL
+  7. continue indexing and watching in the daemon
+  8. open the browser and let the CLI exit promptly
 ```
 
-Development and troubleshooting commands:
+The daemon records `indexing`, `complete`, `refreshing`, or `failed`. An initial
+source becomes visible after a valid header and first event batch. A refresh
+keeps the prior valid generation queryable until its replacement validates and
+commits atomically. Invalid or cancelled refreshes never replace known-good
+data.
 
-```bash
-rlviz serve PATH
-rlviz status
-rlviz stop
-rlviz doctor
+### Read in the browser
+
+The browser receives the daemon token in the URL fragment. Fragments are not
+sent in HTTP requests or referrers; the application reads the token and sends
+it as a bearer credential to versioned local API routes.
+
+The UI requests trajectory metadata and a bounded first page, then loads later
+event, signal, and artifact pages while indexing continues. Event lists are
+virtualized. Raw source locations remain available so a normalized event can be
+traced back to its original record.
+
+### Run a plugin
+
+Adapters and analyzers are subprocesses using versioned JSON/NDJSON protocols.
+RLViz never uses Go native plugins.
+
+```text
+manifest -> schema validation -> path and digest trust check
+         -> copy executable plugin files to a private snapshot
+         -> execute the verified snapshot with bounded I/O
+         -> validate every returned record
 ```
 
-## Canonical data model
+Stdout is protocol-only. Stderr is captured for diagnostics. Any plugin edit
+changes the digest and invalidates trust.
 
-The initial canonical model includes run, case, rollout group, trajectory, event, signal, and artifact entities. Relationships use stable IDs rather than nested in-memory ownership so large collections can be streamed and indexed incrementally.
+## Canonical and derived data
 
-Events retain optional `parent_id`, `alignment_key`, and `state_hash` fields before the branch and comparison UIs ship.
+Canonical v1alpha1 entities are run, case, group, trajectory, event, signal,
+artifact, and complete. Relationships use stable IDs so large sources can be
+streamed without constructing a nested in-memory graph.
 
-## Data flow
+Adapters own source-to-canonical mapping. Analyzers produce deterministic,
+removable findings and signals. Alignment and compact paths are derived views;
+they do not rewrite the source or imply that independently sampled trajectories
+were literal execution branches.
 
-1. Probe a path with built-in and trusted external adapters.
-2. Select the highest-confidence compatible adapter or use an explicit selection.
-3. Stream canonical entities and events from the adapter.
-4. Validate every record against protocol constraints.
-5. Index metadata and searchable text incrementally.
-6. Serve paginated event data to the browser.
-7. Read raw source records and artifacts on demand under a strict path policy.
-8. Invalidate or extend indexes when watched files change.
+The current generic event envelope is adequate for basic viewing but does not
+yet standardize message roles, tool spans, context compaction, verifier
+evidence, or context-window accounting. Those semantics must be designed from
+real formats before a protocol revision. See `data-model.md`.
 
-## API boundaries
+## Frontend structure
 
-The local HTTP API is private to the bundled frontend in the first release. It should still use versioned routes and typed request/response schemas to keep future desktop or editor integrations possible.
+The current React application has four main surfaces:
 
-The plugin protocol is public from its first release. Backward compatibility begins once `v1` is declared stable; pre-stable versions use explicit `v1alphaN` identifiers.
+- `App.tsx`: trajectory loading, routing, timeline, event selection, inspector
+- `GroupView.tsx`: trajectory cohort table and compact behavioral paths
+- `ComparisonView.tsx`: aligned pair comparison and divergence navigation
+- `AnalysisPanel.tsx` and `ArtifactPanel.tsx`: derived findings and artifacts
 
-## Security boundaries
+`api.ts` is the typed daemon client, `types.ts` mirrors API records, and
+`VirtualList.tsx` bounds DOM work for long lists. The current component tree is
+functional but is not the target information architecture. New UI work should
+follow `ui-information-architecture.md` and `design-system.md` rather than
+extending the existing three-pane hierarchy by default.
 
-- The local server binds to loopback only.
-- A per-daemon secret protects source registration and trajectory reads from unrelated local processes and web pages. Browser viewer URLs carry it in the URL fragment, which is not sent in HTTP requests or referrers; the UI adds it as a bearer token.
-- Source registration resolves symlinks and records an allowed root.
-- Artifact reads cannot escape registered roots without explicit user approval.
-- HTML from traces is rendered as text or sanitized content, never trusted markup.
-- External plugins require explicit trust by path and content digest.
-- Trusted plugin code is copied into a private verified snapshot before execution, preventing edits to the project tree from racing execution.
-- Plugin stderr is captured for diagnostics; stdout remains protocol-only.
-- The viewer never re-executes recorded commands or tools.
+## Security invariants
 
-The background daemon stores normalized records and source provenance in a private SQLite database using WAL mode. Initially uncached canonical sources are decoded record-by-record and committed in bounded batches. Registration returns after a valid header and the first available event batch, while the same serialized per-source job tails appended NDJSON until a valid `complete` record arrives. The persisted source state is explicitly `indexing`, `complete`, `refreshing`, or `failed`, so a partial index is never presented as a fresh cache. The browser reads bounded pages and sees each committed batch through normal polling.
+- Bind only to loopback.
+- Require the per-daemon secret for source registration and data reads.
+- Make no outbound requests during normal viewing.
+- Treat rollout sources and referenced data as read-only.
+- Resolve symlinks and prevent artifact reads outside registered roots.
+- Render trace HTML as text or sanitized content, never trusted markup.
+- Never execute recorded commands, tool calls, or model output.
+- Execute external code only after explicit path-and-digest trust.
+- Keep caches separate, discoverable, and removable.
 
-A changed source with a prior valid cache follows a different safety path: the old generation stays queryable while the replacement is fully validated in one transaction. Invalid or canceled refreshes roll back and mark the retained cache failed/stale instead of replacing known-good records. Truncation, file replacement, and prefix/boundary changes restart an initial progressive job; duplicate requests for one source share the same job. External adapter stdout is decoded incrementally with explicit record and total-output limits before validated output is committed atomically to the index.
+These are product boundaries, not implementation details. Changing one requires
+an explicit product decision and an ADR.
 
-## Performance approach
+## Performance invariants
 
-- Stream JSONL and plugin output.
-- Store source byte offsets where formats permit random access.
-- Paginate events in the HTTP API.
-- Virtualize the browser timeline.
-- Truncate previews without truncating accessible raw content.
-- Compute group aggregates from indexed fields.
-- Cache behavioral fingerprints and alignment results by content digest.
-- Profile before introducing memory mapping or lower-level storage.
+- Decode and validate streams incrementally.
+- Commit bounded SQLite batches.
+- Paginate events, signals, artifacts, and group summaries.
+- Virtualize long browser collections.
+- Preserve the old valid generation during refresh.
+- Cache derived analysis by input and implementation digest.
+- Profile representative traces before introducing lower-level complexity.
+
+Quality budgets and representative fixture requirements live in `testing.md`.
+
+## Where to start a change
+
+| Change | Read first | Typical implementation surface |
+| --- | --- | --- |
+| CLI or machine output | `onboarding.md`, public command docs | `cmd/rlviz`, command tests |
+| Canonical semantics | `data-model.md`, protocol docs | model, schemas, fixtures, index, API, UI |
+| Adapter/analyzer behavior | `plugin-model.md`, relevant protocol | plugins, schemas, fixtures, conformance tests |
+| Viewer behavior | `ui-information-architecture.md`, `design-system.md` | `web/src`, API only when required |
+| Daemon or cache | ADR 0001/0003, this document | daemon, app, index, server |
+| Release/install | `releasing.md` | workflows, package, formula, scripts |
+
+Keep this document current when a subsystem, boundary, request path, or
+repository responsibility changes.

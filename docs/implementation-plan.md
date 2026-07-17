@@ -160,12 +160,83 @@ Milestones 0–7 are implemented in the repository: versioned contracts and fixt
 - Normal viewing makes no outbound requests.
 - Documentation covers unsupported formats and safe plugin review.
 
+## Milestone 8: product and design foundations
+
+### Deliverables
+
+- Current system architecture and change map
+- Researcher-centered UI information architecture
+- Design tokens, typography, density, and core component primitives
+- Central command registry and rebindable local keymap
+- Representative rich, context-compaction, verifier, group, and long-run fixtures
+- Initial real-browser, screenshot, and accessibility quality gates
+
+### Exit criteria
+
+- The UI has one dominant reading surface and consistent supporting panels.
+- Shortcut help, command palette, and displayed key hints come from one registry.
+- Essential text remains readable in comfortable and compact density.
+- Visible workflows have deterministic browser coverage and visual evidence.
+
+## Milestone 9: expert onboarding
+
+### Deliverables
+
+- Rich bundled `rlviz demo`
+- `rlviz formats [--json]`
+- Read-only `rlviz inspect SOURCE [--json]`
+- Safe agent-integration print/setup commands
+- Explicit supported-format documentation
+- Improved unsupported-format and adapter-scaffold guidance
+
+### Exit criteria
+
+- A clean install reaches a representative demo in under one minute.
+- Users can distinguish built-in, example, discovered, trusted, and unsupported formats.
+- A coding agent can move from probe to reviewed adapter without matching human error text.
+- Agent setup never overwrites existing project instructions.
+
+## Milestone 10: research-grade trajectory reader
+
+### Deliverables
+
+- Transcript and event-timeline modes
+- Turn and tool-span grouping with raw-event fallback
+- First-class outcome, verifier, reward, and final-output surface
+- Context-usage track and compaction/truncation landmarks
+- Selected-event-first details and evidence panel
+- Semantic landmark rail and whole-trajectory minimap
+
+### Exit criteria
+
+- A researcher can explain the outcome without hunting through raw events.
+- Context gained, lost, compacted, or restored is visible when the source provides it.
+- Every grouped or derived surface links to canonical and raw source records.
+- A 10,000-event trajectory remains keyboard-navigable and responsive.
+
+## Milestone 11: group, divergence, and safe customization
+
+### Deliverables
+
+- Cohort distributions, multi-signal filters, outlier shortcuts, and saved columns
+- Outcome, verifier, context, and compaction deltas in pair comparison
+- Synchronized detail and structured tool argument/result differences
+- Declarative field, signal, inspector, theme-token, and keymap customization
+- Bounded adapter discovery and probe ranking without implicit executable trust
+
+### Exit criteria
+
+- Researchers can choose representative cohorts before opening individual runs.
+- Comparison explains meaningful behavioral and context divergence, not only raw JSON difference.
+- Customization uses validated core primitives and cannot inject arbitrary viewer JavaScript or CSS.
+
 ## Near-term issue sequence
 
-1. Validate the clean-machine install-to-open path on Linux; macOS curl, Homebrew, and npm paths are verified.
-2. Gather real adapter fixtures from environment and post-training workflows.
-3. Profile larger rollout groups and tune the existing event, signal, and artifact cursors.
-4. Extend comparison sets across sources, runs, and checkpoints after the local single-source workflow is proven.
+1. Implement Milestone 8 before visually repainting the current three-pane viewer.
+2. Gather real adapter fixtures and use them to validate message, tool-span, verifier, and context semantics.
+3. Implement the rich demo and expert CLI onboarding against those semantics.
+4. Rebuild the single-trajectory reader, then apply the same system to groups and comparison.
+5. Validate the clean-machine install-to-open path on Linux; macOS curl, Homebrew, and npm paths are verified.
 
 ## Quality gates
 

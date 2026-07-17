@@ -1,0 +1,105 @@
+# Testing and quality gates
+
+## Purpose
+
+Tests should make RLViz easier to change without turning the repository into a
+heavy framework project. Favor a small number of representative end-to-end
+flows, strong protocol fixtures, and focused component/unit tests.
+
+## Existing baseline
+
+`make check` verifies Go formatting and vetting, Go tests, React/Vitest tests,
+npm installer tests, the production web build, the curl installer, and Homebrew
+formula rendering. CI also runs the Go race detector and release-target builds.
+
+## Test layers
+
+### Contract and fixture tests
+
+Every canonical or plugin protocol feature has valid, malformed, and adversarial
+fixtures. Decoder and schema tests must agree. Semantic additions include source
+provenance and compatibility coverage.
+
+Required representative fixtures:
+
+- rich single rollout with messages, tools, artifacts, reward, and verifier
+- long rollout with multiple compactions and context accounting
+- nested/subagent and branch relationships
+- group with pass, policy failure, and infrastructure failure cohorts
+- pair with textual difference, behavioral divergence, and later realignment
+- partial/growing source and failed refresh
+- generated 10,000+ event performance source
+
+Keep committed fixtures small, synthetic, deterministic, and non-sensitive.
+Generate large fixtures during tests when practical.
+
+### Go subsystem tests
+
+Keep table-driven tests at model, plugin, index, daemon, server, alignment, and
+watch boundaries. Race-test daemon, indexing, refresh, and shared-job behavior.
+
+### React unit and interaction tests
+
+Use Vitest and Testing Library for component state, keyboard commands, focus,
+filtering, deep-link restoration, partial data, and error behavior. Test the
+central command registry independently for defaults, scope, overrides,
+conflicts, and reset.
+
+### Real-browser end-to-end tests
+
+Start with five Chromium flows:
+
+1. Rich demo opens; transcript and keyboard navigation work.
+2. Long trajectory searches, filters, selects landmarks, and restores a deep link.
+3. Group sorting, cohort selection, best/worst, and compare work.
+4. Pair comparison reaches divergence, next change, and restores its URL.
+5. The packaged binary starts a daemon, serves an authenticated fixture, loads
+   the browser UI, and stops cleanly.
+
+CLI unsupported-format and adapter diagnostics remain Go/process integration
+tests unless a browser surface is involved.
+
+### Visual and accessibility checks
+
+Capture deterministic screenshots for trajectory, group, and comparison at one
+fixed desktop viewport and font environment. Check comfortable and compact
+density only after both exist. Keep screenshot scope broad enough to catch
+hierarchy regressions but small enough to review intentionally.
+
+Run automated accessibility checks on the same three surfaces. Also test focus
+return, keyboard-only completion, semantic landmarks, and non-color status cues.
+
+## Quality budgets
+
+Initial budgets should be measured on a documented reference machine and then
+kept stable:
+
+- warm small-source first meaningful paint: about one second
+- `rlviz open` returns after registration rather than full indexing
+- smooth navigation and bounded DOM size at 10,000 events
+- search and next-landmark commands respond within one animation frame after
+  indexes are ready
+- progressive indexing does not block already committed pages
+- normal viewing produces zero outbound network requests
+
+Avoid exact cross-machine millisecond gates until the benchmark harness can
+control noise. Use relative regression thresholds and structural assertions
+first.
+
+## Change matrix
+
+| Change | Minimum verification |
+| --- | --- |
+| Go-only internal behavior | focused Go tests, `make check` |
+| Canonical/protocol | schemas, fixtures, Go and TypeScript types, conformance tests, docs, `make check` |
+| Visible UI | focused component tests, real-browser flow, fixed-viewport visual review, `make check` |
+| Keymap or focus | command registry tests, keyboard E2E, accessibility check |
+| Installer/release | relevant installer tests, snapshot/release check |
+| Performance path | representative benchmark plus full check |
+
+## Dependency policy
+
+Add tools only when they enforce a durable quality boundary. A browser runner
+and an accessibility scanner are justified. Do not add Storybook or a large UI
+framework solely to host components; a small fixture/dev route can exercise the
+real embedded application with less duplication.

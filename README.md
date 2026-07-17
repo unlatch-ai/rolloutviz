@@ -91,7 +91,14 @@ The npm installer selects the matching macOS or Linux release and verifies its c
 ## Repository map
 
 - [`docs/product-spec.md`](docs/product-spec.md) defines the user experience and scope.
-- [`docs/architecture.md`](docs/architecture.md) defines the initial technical architecture.
+- [`docs/architecture.md`](docs/architecture.md) is the current subsystem and runtime map.
+- [`docs/ui-information-architecture.md`](docs/ui-information-architecture.md) defines the target researcher workflow and screen hierarchy.
+- [`docs/design-system.md`](docs/design-system.md) defines visual and interaction invariants.
+- [`docs/data-model.md`](docs/data-model.md) tracks canonical research semantics and protocol evolution.
+- [`docs/onboarding.md`](docs/onboarding.md) defines the expert and coding-agent setup journey.
+- [`docs/supported-formats.md`](docs/supported-formats.md) states exactly what RLViz can open today.
+- [`docs/plugin-model.md`](docs/plugin-model.md) defines adapter, analyzer, and safe customization boundaries.
+- [`docs/testing.md`](docs/testing.md) defines fixtures, test layers, and quality budgets.
 - [`docs/adapter-protocol.md`](docs/adapter-protocol.md) defines the external adapter boundary.
 - [`docs/implementation-plan.md`](docs/implementation-plan.md) breaks the work into testable milestones.
 - [`docs/releasing.md`](docs/releasing.md) documents native, Homebrew, and npm publication.
