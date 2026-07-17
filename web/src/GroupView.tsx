@@ -87,10 +87,10 @@ function displayLatency(value?: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)}s` : `${Math.round(value)}ms`;
 }
 
-export function GroupView({ group, paths, pathsError, onClose, onOpen, onCompare }: { group: GroupResponse; paths?: GroupPathsResponse | null; pathsError?: string; onClose: () => void; onOpen: (id: string) => void; onCompare?: (left: string, right: string) => void }) {
+export function GroupView({ group, paths, pathsError, initialQuery = "", onQueryChange, onClose, onOpen, onCompare }: { group: GroupResponse; paths?: GroupPathsResponse | null; pathsError?: string; initialQuery?: string; onQueryChange?: (query: string) => void; onClose: () => void; onOpen: (id: string) => void; onCompare?: (left: string, right: string) => void }) {
   useKeymapRevision();
   const rows = useMemo(() => group.trajectories.map(rowFromSummary).filter((row) => row.id), [group]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [sort, setSort] = useState<string>("reward");
   const [descending, setDescending] = useState(true);
   const [selected, setSelected] = useState(0);
@@ -131,13 +131,14 @@ export function GroupView({ group, paths, pathsError, onClose, onOpen, onCompare
 
   const chooseSort = (key: string) => { if (sort === key) setDescending((value) => !value); else { setSort(key); setDescending(key !== "id"); } };
   const toggleCompare = (id: string) => setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 2 ? [...current, id] : [current[1], id]);
+  const updateQuery = (value: string) => { setQuery(value); onQueryChange?.(value); };
 
   useEffect(() => setSelected((index) => Math.min(index, Math.max(visible.length - 1, 0))), [visible.length]);
   useEffect(() => setSelectedPath((index) => Math.min(index, Math.max(flatPaths.length - 1, 0))), [flatPaths.length]);
   useCommands("group", {
     [commandIds.group.back]: (event) => {
       const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
-      if (typing) { searchRef.current?.blur(); setQuery(""); } else onClose();
+      if (typing) { searchRef.current?.blur(); updateQuery(""); } else onClose();
     },
     [commandIds.group.togglePaths]: () => (paths || pathsError) ? void setMode("paths") : false,
     [commandIds.group.search]: () => searchRef.current?.focus(),
@@ -187,7 +188,7 @@ export function GroupView({ group, paths, pathsError, onClose, onOpen, onCompare
         {!flatPaths.length && <div className="group-empty">No behavioral events · {paths.tree.narrative_only_count} narrative-only trajectories</div>}
       </div> : <div className="group-empty">{pathsError || "Compact paths are still loading"}</div>}
     </section> : <section className="group-table-panel">
-      <div className="group-tools"><label><span>⌕</span><input ref={searchRef} aria-label="Filter trajectories" aria-invalid={queryDiagnostic ? true : undefined} aria-errormessage={queryDiagnostic ? "group-filter-error" : undefined} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter · pass:false reward<0" title="Plain text or structured clauses, for example pass:false reward<0 signal.policy_reward<0" /><kbd>{bindingLabel(commandIds.group.search)}</kbd></label>{queryDiagnostic && <small id="group-filter-error" className="group-filter-error" role="status">{queryDiagnostic.message}</small>}<div className="compare-tools"><span>{compareIds.length}/2 selected</span><button disabled={compareIds.length !== 2 || !onCompare} onClick={() => onCompare?.(compareIds[0], compareIds[1])}>Compare <kbd>{bindingLabel(commandIds.group.compare)}</kbd></button></div>{availableSignalCount > 0 && <span title={`${availableSignalCount} scalar canonical signals available`}>{signalColumnCount}/{availableSignalCount} signals</span>}<span>{visible.length}/{rows.length}</span></div>
+      <div className="group-tools"><label><span>⌕</span><input ref={searchRef} aria-label="Filter trajectories" aria-invalid={queryDiagnostic ? true : undefined} aria-errormessage={queryDiagnostic ? "group-filter-error" : undefined} value={query} onChange={(event) => updateQuery(event.target.value)} placeholder="Filter · pass:false reward<0" title="Plain text or structured clauses, for example pass:false reward<0 signal.policy_reward<0" /><kbd>{bindingLabel(commandIds.group.search)}</kbd></label>{queryDiagnostic && <small id="group-filter-error" className="group-filter-error" role="status">{queryDiagnostic.message}</small>}<div className="compare-tools"><span>{compareIds.length}/2 selected</span><button disabled={compareIds.length !== 2 || !onCompare} onClick={() => onCompare?.(compareIds[0], compareIds[1])}>Compare <kbd>{bindingLabel(commandIds.group.compare)}</kbd></button></div>{availableSignalCount > 0 && <span title={`${availableSignalCount} scalar canonical signals available`}>{signalColumnCount}/{availableSignalCount} signals</span>}<span>{visible.length}/{rows.length}</span></div>
       <div className="group-table-scroll">
         <table className="group-table"><thead><tr><th className="compare-check-heading">Compare</th><th className="trajectory-column"><button onClick={() => chooseSort("id")}>Trajectory {sort === "id" ? (descending ? "↓" : "↑") : ""}</button></th>{columns.map(({ key, label, signal }) => <th key={key} title={signal ? `Canonical signal: ${signal}` : undefined}><button onClick={() => chooseSort(key)}>{label} {sort === key ? (descending ? "↓" : "↑") : ""}</button></th>)}<th></th></tr></thead>
           <tbody>{visible.map((row, index) => <tr key={row.id} className={`${index === selected ? "selected" : ""} ${compareIds.includes(row.id) ? "compare-selected" : ""}`} aria-selected={index === selected} onClick={() => setSelected(index)} onDoubleClick={() => onOpen(row.id)}>

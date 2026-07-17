@@ -166,6 +166,10 @@ opening individual runs.
 - explicit comparison selection and saved column layout
 - compact behavioral paths as a secondary explanation, clearly labeled derived
 
+The current table supports ANDed plain-text, outcome, core-metric, and scalar
+signal filters. The active cohort query is URL-backed so reloads and copied
+links preserve the selection without a hosted saved-view service.
+
 Pair comparison is the first comparison mode. Later comparison sets may support
 pass-versus-fail and checkpoint-versus-checkpoint cohorts.
 

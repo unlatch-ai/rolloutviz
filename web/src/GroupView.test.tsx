@@ -131,6 +131,16 @@ describe("trajectory group", () => {
     expect(screen.queryByText("attempt-good")).not.toBeInTheDocument();
   });
 
+  it("restores and reports a shareable cohort query", () => {
+    const onQueryChange = vi.fn();
+    render(<GroupView group={mixedGroup} initialQuery="pass:false" onQueryChange={onQueryChange} onClose={() => {}} onOpen={() => {}} />);
+    const filter = screen.getByLabelText("Filter trajectories");
+    expect(filter).toHaveValue("pass:false");
+    expect(screen.getByText("1/3")).toBeInTheDocument();
+    fireEvent.change(filter, { target: { value: "reward>=1" } });
+    expect(onQueryChange).toHaveBeenLastCalledWith("reward>=1");
+  });
+
   it("selects exactly two trajectories by mouse and keyboard, then compares them", () => {
     const compare = vi.fn();
     render(<GroupView group={mixedGroup} onClose={() => {}} onOpen={() => {}} onCompare={compare} />);

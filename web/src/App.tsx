@@ -22,7 +22,7 @@ const kindMark: Record<string, string> = {
 const filterKinds = ["all", "generation", "tool", "observation", "reward", "grader", "error"];
 const eventKey = (event: TrajectoryEvent) => event.id;
 
-const viewerKeys = ["view", "left", "right", "step"];
+const viewerKeys = ["view", "left", "right", "step", "cohort_filter"];
 function validID(value: string | null, max = 512): string | null {
   return value && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value) ? value : null;
 }
@@ -395,7 +395,7 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
   </div>;
   if (group) return <div className="app-shell group-shell">
     <header className="topbar"><div className="brand"><span className="brand-mark">RV</span><span>RLViz</span></div><div className="crumb"><span>{trajectory.run_id || "local run"}</span><b>/</b><strong>{group.group_id}</strong></div>{(groupError || isDemo) && <div className="top-actions">{groupError && <span className="group-error">{groupError}</span>}{isDemo && <span className="demo-pill">Synthetic demo</span>}</div>}</header>
-    <GroupView group={group} paths={groupPaths} pathsError={groupPathsError} onClose={() => { setGroup(null); replaceParams((params) => viewerKeys.forEach((key) => params.delete(key))); }} onOpen={openGroupTrajectory} onCompare={(left, right) => void openComparison(left, right)} />
+    <GroupView group={group} paths={groupPaths} pathsError={groupPathsError} initialQuery={validID(new URLSearchParams(globalThis.location?.search ?? "").get("cohort_filter"), 1024) ?? ""} onQueryChange={(value) => replaceParams((params) => value ? params.set("cohort_filter", value) : params.delete("cohort_filter"))} onClose={() => { setGroup(null); replaceParams((params) => viewerKeys.forEach((key) => params.delete(key))); }} onOpen={openGroupTrajectory} onCompare={(left, right) => void openComparison(left, right)} />
   </div>;
   if (!selected) return <main className="empty">No events in this trajectory.</main>;
   return (

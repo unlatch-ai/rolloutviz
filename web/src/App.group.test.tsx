@@ -23,7 +23,7 @@ describe("group workflow", () => {
   afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState({}, "", "/"); });
 
   it("restores group view directly from the URL", async () => {
-    window.history.replaceState({}, "", "/?trajectory=source-1&indexed=1&view=group#token=secret");
+    window.history.replaceState({}, "", "/?trajectory=source-1&indexed=1&view=group&cohort_filter=pass%3Afalse#token=secret");
     const fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/indexed/group")) return new Response(JSON.stringify(mixedGroup));
@@ -33,6 +33,11 @@ describe("group workflow", () => {
     vi.stubGlobal("fetch", fetch);
     render(<App initialTrajectory={{ ...sampleTrajectory, group_id: "group-eval-7" }} />);
     expect(await screen.findByRole("main", { name: "Trajectory group" })).toBeInTheDocument();
+    const filter = screen.getByLabelText("Filter trajectories");
+    expect(filter).toHaveValue("pass:false");
+    expect(screen.queryByText("attempt-good")).not.toBeInTheDocument();
+    fireEvent.change(filter, { target: { value: "reward>=1" } });
+    expect(new URLSearchParams(window.location.search).get("cohort_filter")).toBe("reward>=1");
     expect(window.location.hash).toBe("#token=secret");
   });
 
