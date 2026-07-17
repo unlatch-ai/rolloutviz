@@ -120,7 +120,7 @@ The npm installer selects the matching macOS or Linux release and verifies its c
 - **Agent extensible.** Unsupported formats should produce enough structured context for a coding agent to implement and validate an adapter.
 - **Lossless inspection.** Normalized events always link back to their raw source records.
 - **Fast by default.** Large files are streamed and indexed instead of loaded wholesale.
-- **Comparison aware.** Rollout groups and parent relationships exist in the data model before their full UI ships.
+- **Comparison aware.** Rollout groups, behavioral paths, and aligned pair comparisons are first-class views.
 
 ## Repository map
 

@@ -186,8 +186,8 @@ Package-manager postinstall scripts should not modify project instructions.
 
 ## Browser welcome surface
 
-`rlviz demo` or an explicit future `rlviz welcome` may open a welcome surface
-with three concise actions:
+An explicit future `rlviz welcome` may open a welcome surface with three
+concise actions:
 
 1. Open the demo
 2. Open a source from the CLI

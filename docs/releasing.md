@@ -24,25 +24,49 @@ re-bootstrap steps live in
 
 ## Publish
 
-1. Confirm the package version in `packages/npm/package.json` matches the release.
-2. Run the local release gates:
+1. Choose the release version and confirm it does not already exist locally or
+   on GitHub:
 
    ```bash
+   VERSION=0.2.0
+   if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+     echo "local tag v${VERSION} already exists" >&2
+     exit 1
+   fi
+   if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+     echo "remote tag v${VERSION} already exists" >&2
+     exit 1
+   fi
+   ```
+
+2. Run the local release gates from a clean `main` branch at the same commit as
+   `origin/main`:
+
+   ```bash
+   test "$(git branch --show-current)" = main
+   test -z "$(git status --porcelain)"
+   git fetch origin main --tags
+   test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
    make check
+   go test -race ./...
    goreleaser release --snapshot --clean
    ```
 
-3. Commit and push a clean `main` branch.
-4. Create and push the tag:
+3. Create an annotated tag at the audited commit, then push that exact tag:
 
    ```bash
-   git tag -a v0.1.0 -m "rlviz v0.1.0"
-   git push origin v0.1.0
+   git tag -a "v${VERSION}" -m "rlviz v${VERSION}"
+   test "$(git rev-list -n 1 "v${VERSION}")" = "$(git rev-parse HEAD)"
+   git push origin "v${VERSION}"
    ```
 
-5. Verify the GitHub release contains four archives, `checksums.txt`, and
+   The release workflow derives the npm package version from the tag before
+   publishing, so `packages/npm/package.json` does not need a release-only
+   commit.
+
+4. Verify the GitHub release contains four archives, `checksums.txt`, and
    `rlviz.rb`, and that the attestation step passed.
-6. On a clean machine, exercise one native archive, the curl installer, the
+5. On a clean machine, exercise one native archive, the curl installer, the
    Homebrew formula when enabled, and the npm package when enabled.
 
 Do not reuse or move a published tag. Fix a broken release with a new patch

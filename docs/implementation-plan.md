@@ -145,7 +145,7 @@ Milestones 0–7 are implemented in the repository: versioned contracts and fixt
 ### Deliverables
 
 - macOS arm64/x64 and Linux arm64/x64 releases
-- Checksums and signed artifacts
+- Checksums and GitHub artifact attestations
 - Homebrew tap
 - Reproducible release workflow
 - Security policy and threat-model review
@@ -177,7 +177,7 @@ additional representative real-format fixtures remain ongoing quality work.
 ### Exit criteria
 
 - The UI has one dominant reading surface and consistent supporting panels.
-- Shortcut help, command palette, and displayed key hints come from one registry.
+- Shortcut help, rebindable settings, and displayed key hints come from one registry.
 - Essential text remains readable in comfortable and compact density.
 - Visible workflows have deterministic browser coverage and visual evidence.
 
@@ -256,7 +256,7 @@ keymap defaults now use that same bounded contract.
 - Outcome, verifier, context, and compaction deltas in pair comparison
 - Synchronized detail and structured tool argument/result differences
 - Declarative field, signal, inspector, theme-token, and keymap customization
-- Bounded adapter discovery and probe ranking without implicit executable trust
+- Bounded adapter discovery and deterministic inventory ranking without implicit executable trust
 
 ### Exit criteria
 
