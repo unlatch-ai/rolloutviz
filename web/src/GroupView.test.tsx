@@ -101,6 +101,25 @@ describe("trajectory group", () => {
     expect(screen.getByText("attempt-good").closest("tr")).toHaveAttribute("aria-selected", "true");
   });
 
+  it("selects median, reward outlier, failed, and infrastructure trajectories", () => {
+    const group: GroupResponse = { group_id: "shortcuts", trajectories: [
+      { trajectory: { id: "policy-outlier", group_id: "shortcuts", termination: "policy_violation" }, reward: -5, pass: false },
+      { trajectory: { id: "median-run", group_id: "shortcuts", termination: "success" }, reward: 0, pass: true },
+      { trajectory: { id: "infra-run", group_id: "shortcuts", termination: "infrastructure_error" }, reward: 1, pass: false, signals: { failure_class: "infrastructure" } },
+      { trajectory: { id: "best-run", group_id: "shortcuts", termination: "success" }, reward: 2, pass: true },
+    ] };
+    render(<GroupView group={group} onClose={() => {}} onOpen={() => {}} />);
+    fireEvent.keyDown(window, { key: "m" });
+    expect(screen.getByText("median-run").closest("tr")).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(window, { key: "u" });
+    expect(screen.getByText("policy-outlier").closest("tr")).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(window, { key: "f" });
+    expect(screen.getByText("infra-run").closest("tr")).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(window, { key: "m" });
+    fireEvent.keyDown(window, { key: "i" });
+    expect(screen.getByText("infra-run").closest("tr")).toHaveAttribute("aria-selected", "true");
+  });
+
   it("filters rows and supports j/k navigation", () => {
     render(<GroupView group={mixedGroup} onClose={() => {}} onOpen={() => {}} />);
     fireEvent.keyDown(window, { key: "/" });

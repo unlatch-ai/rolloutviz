@@ -234,8 +234,9 @@ Status: deterministic behavioral alignment, divergence navigation, and pair
 summary deltas for outcome, tokens, explicit context events, compactions, and
 source-shaped verifier results are implemented. Reproducible cohort filters
 cover outcome fields, core metrics, and scalar signals. Selected tool arguments
-and results have a bounded field-level diff. Saved views and declarative
-customization remain.
+and results have a bounded field-level diff. Reward-rank, outlier, failure, and
+infrastructure shortcuts are command-registry backed. Saved column layouts and
+declarative customization remain.
 
 ### Deliverables
 

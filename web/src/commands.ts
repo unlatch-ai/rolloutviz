@@ -13,7 +13,8 @@ export const commandIds = {
   group: {
     back: "group.back", togglePaths: "group.togglePaths", search: "group.search", next: "group.next",
     previous: "group.previous", open: "group.open", toggleCompare: "group.toggleCompare",
-    compare: "group.compare", best: "group.best", worst: "group.worst",
+    compare: "group.compare", best: "group.best", median: "group.median", worst: "group.worst",
+    rewardOutlier: "group.rewardOutlier", nextFailure: "group.nextFailure", nextInfraFailure: "group.nextInfraFailure",
   },
   paths: {
     back: "paths.back", togglePaths: "paths.togglePaths", next: "paths.next", previous: "paths.previous", open: "paths.open",
@@ -62,7 +63,11 @@ export const commands: readonly CommandDefinition[] = [
   { id: commandIds.group.toggleCompare, scope: "group", label: "Mark for comparison", defaultBindings: ["Space", "c"] },
   { id: commandIds.group.compare, scope: "group", label: "Compare selected trajectories", defaultBindings: ["v"] },
   { id: commandIds.group.best, scope: "group", label: "Select best trajectory", defaultBindings: ["b"] },
+  { id: commandIds.group.median, scope: "group", label: "Select median-reward trajectory", defaultBindings: ["m"] },
   { id: commandIds.group.worst, scope: "group", label: "Select worst trajectory", defaultBindings: ["w"] },
+  { id: commandIds.group.rewardOutlier, scope: "group", label: "Select reward outlier", defaultBindings: ["u"] },
+  { id: commandIds.group.nextFailure, scope: "group", label: "Jump to next failed trajectory", defaultBindings: ["f"] },
+  { id: commandIds.group.nextInfraFailure, scope: "group", label: "Jump to next infrastructure failure", defaultBindings: ["i"] },
 
   { id: commandIds.paths.back, scope: "paths", label: "Back to trajectory", defaultBindings: ["Escape"], allowInInput: true },
   { id: commandIds.paths.togglePaths, scope: "paths", label: "Back to trajectories", defaultBindings: ["p"] },

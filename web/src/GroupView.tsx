@@ -87,6 +87,24 @@ function displayLatency(value?: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)}s` : `${Math.round(value)}ms`;
 }
 
+function rewardRankIndex(rows: Row[], rank: "best" | "median" | "worst" | "outlier"): number | undefined {
+  const candidates = rows.map((row, index) => ({ row, index })).filter(({ row }) => row.reward !== undefined)
+    .sort((left, right) => left.row.reward! - right.row.reward! || left.row.id.localeCompare(right.row.id));
+  if (!candidates.length) return undefined;
+  if (rank === "worst") return candidates[0].index;
+  if (rank === "best") return candidates[candidates.length - 1].index;
+  const median = candidates[Math.floor((candidates.length - 1) / 2)].row.reward!;
+  if (rank === "median") return candidates[Math.floor((candidates.length - 1) / 2)].index;
+  return [...candidates].sort((left, right) => Math.abs(right.row.reward! - median) - Math.abs(left.row.reward! - median) || left.row.id.localeCompare(right.row.id))[0].index;
+}
+
+function isInfrastructureFailure(row: Row): boolean {
+  const failureClass = Object.entries(row.signals).find(([name]) => name.toLowerCase() === "failure_class")?.[1];
+  return (typeof failureClass === "string" && failureClass.toLowerCase() === "infrastructure")
+    || row.outcome?.toLowerCase() === "infrastructure_error"
+    || row.termination?.toLowerCase() === "infrastructure_error";
+}
+
 export function GroupView({ group, paths, pathsError, initialQuery = "", onQueryChange, onClose, onOpen, onCompare }: { group: GroupResponse; paths?: GroupPathsResponse | null; pathsError?: string; initialQuery?: string; onQueryChange?: (query: string) => void; onClose: () => void; onOpen: (id: string) => void; onCompare?: (left: string, right: string) => void }) {
   useKeymapRevision();
   const rows = useMemo(() => group.trajectories.map(rowFromSummary).filter((row) => row.id), [group]);
@@ -132,6 +150,14 @@ export function GroupView({ group, paths, pathsError, initialQuery = "", onQuery
   const chooseSort = (key: string) => { if (sort === key) setDescending((value) => !value); else { setSort(key); setDescending(key !== "id"); } };
   const toggleCompare = (id: string) => setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 2 ? [...current, id] : [current[1], id]);
   const updateQuery = (value: string) => { setQuery(value); onQueryChange?.(value); };
+  const selectRewardRank = (rank: "best" | "median" | "worst" | "outlier") => { const index = rewardRankIndex(visible, rank); if (index === undefined) return false; setSelected(index); };
+  const selectNext = (predicate: (row: Row) => boolean) => {
+    if (!visible.some(predicate)) return false;
+    for (let offset = 1; offset <= visible.length; offset += 1) {
+      const index = (selected + offset) % visible.length;
+      if (predicate(visible[index])) { setSelected(index); return; }
+    }
+  };
 
   useEffect(() => setSelected((index) => Math.min(index, Math.max(visible.length - 1, 0))), [visible.length]);
   useEffect(() => setSelectedPath((index) => Math.min(index, Math.max(flatPaths.length - 1, 0))), [flatPaths.length]);
@@ -147,8 +173,12 @@ export function GroupView({ group, paths, pathsError, initialQuery = "", onQuery
     [commandIds.group.open]: () => visible[selected] ? void onOpen(visible[selected].id) : false,
     [commandIds.group.toggleCompare]: () => visible[selected] ? void toggleCompare(visible[selected].id) : false,
     [commandIds.group.compare]: () => compareIds.length === 2 && onCompare ? void onCompare(compareIds[0], compareIds[1]) : false,
-    [commandIds.group.best]: () => { const best = visible.reduce((winner, row, index) => (row.reward ?? -Infinity) > (visible[winner]?.reward ?? -Infinity) ? index : winner, 0); setSelected(best); },
-    [commandIds.group.worst]: () => { const worst = visible.reduce((winner, row, index) => (row.reward ?? Infinity) < (visible[winner]?.reward ?? Infinity) ? index : winner, 0); setSelected(worst); },
+    [commandIds.group.best]: () => selectRewardRank("best"),
+    [commandIds.group.median]: () => selectRewardRank("median"),
+    [commandIds.group.worst]: () => selectRewardRank("worst"),
+    [commandIds.group.rewardOutlier]: () => selectRewardRank("outlier"),
+    [commandIds.group.nextFailure]: () => selectNext((row) => row.pass === false),
+    [commandIds.group.nextInfraFailure]: () => selectNext(isInfrastructureFailure),
   }, mode === "trajectories");
   useCommands("paths", {
     [commandIds.paths.back]: onClose,
@@ -199,6 +229,6 @@ export function GroupView({ group, paths, pathsError, initialQuery = "", onQuery
         {!visible.length && <div className="group-empty">{queryDiagnostic ? `Invalid filter · ${queryDiagnostic.message}` : "No matching trajectories"}</div>}
       </div>
     </section>}
-    <footer className="group-keybar"><span><kbd>{bindingLabel(mode === "paths" ? commandIds.paths.togglePaths : commandIds.group.togglePaths)}</kbd> {mode === "paths" ? "trajectories" : "paths"}</span><span><kbd>{bindingLabel(mode === "paths" ? commandIds.paths.next : commandIds.group.next)}</kbd><kbd>{bindingLabel(mode === "paths" ? commandIds.paths.previous : commandIds.group.previous)}</kbd> select</span>{mode === "paths" ? <><span><kbd>{bindingLabel(commandIds.paths.open)}</kbd> open sample</span></> : <><span><kbd>{bindingLabel(commandIds.group.toggleCompare)}</kbd> mark</span><span><kbd>{bindingLabel(commandIds.group.compare)}</kbd> compare</span><span><kbd>{bindingLabel(commandIds.group.best)}</kbd> best</span><span><kbd>{bindingLabel(commandIds.group.worst)}</kbd> worst</span><span><kbd>{bindingLabel(commandIds.group.open)}</kbd> open</span><span><kbd>{bindingLabel(commandIds.group.search)}</kbd> filter</span></>}</footer>
+    <footer className="group-keybar"><span><kbd>{bindingLabel(mode === "paths" ? commandIds.paths.togglePaths : commandIds.group.togglePaths)}</kbd> {mode === "paths" ? "trajectories" : "paths"}</span><span><kbd>{bindingLabel(mode === "paths" ? commandIds.paths.next : commandIds.group.next)}</kbd><kbd>{bindingLabel(mode === "paths" ? commandIds.paths.previous : commandIds.group.previous)}</kbd> select</span>{mode === "paths" ? <><span><kbd>{bindingLabel(commandIds.paths.open)}</kbd> open sample</span></> : <><span><kbd>{bindingLabel(commandIds.group.toggleCompare)}</kbd> mark</span><span><kbd>{bindingLabel(commandIds.group.compare)}</kbd> compare</span><span><kbd>{bindingLabel(commandIds.group.best)}</kbd><kbd>{bindingLabel(commandIds.group.median)}</kbd><kbd>{bindingLabel(commandIds.group.worst)}</kbd> reward rank</span><span><kbd>{bindingLabel(commandIds.group.rewardOutlier)}</kbd> outlier</span><span><kbd>{bindingLabel(commandIds.group.nextFailure)}</kbd><kbd>{bindingLabel(commandIds.group.nextInfraFailure)}</kbd> failures</span><span><kbd>{bindingLabel(commandIds.group.open)}</kbd> open</span><span><kbd>{bindingLabel(commandIds.group.search)}</kbd> filter</span></>}</footer>
   </main>;
 }
