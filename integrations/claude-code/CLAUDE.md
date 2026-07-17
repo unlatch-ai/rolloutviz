@@ -18,10 +18,12 @@ provided. Otherwise scaffold an adapter in the current repository:
 rlviz plugin init --json --type adapter --lang python --from "<source>" .rlviz/plugins/<name>
 ```
 
-Edit only the generated adapter. Convert representative source records to the
-canonical `rlviz.dev/v1alpha1` stream, preserving order, stable identity,
-and source locations. Use machine-readable validator findings to repair the
-adapter; never rewrite the source to make validation pass.
+Read `source.profile` from the JSON result first. It is a bounded, value-free
+map of observed field paths and JSON types, not a complete schema. Then edit
+only the generated adapter and inspect only the representative records needed
+to convert the source to canonical `rlviz.dev/v1alpha1` records. Preserve order,
+stable identity, and source locations. Use machine-readable validator findings
+to repair the adapter; never rewrite the source to make validation pass.
 
 Review the manifest and all executable adapter files, summarize what will run,
 and get the user's explicit approval before trust. Never auto-trust a discovered,

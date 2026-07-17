@@ -109,11 +109,13 @@ The target convenience flow is:
 rlviz plugin init --type adapter --from ./path/to/rollout .rlviz/plugins/my-format
 ```
 
-An agent inspects a bounded representative sample and edits the generated
-adapter. The command itself does not read or copy source contents. With
-`--json`, it returns the resolved source shape, generated files,
-`review_required: true`, and exact next commands. The user reviews the
-executable files before trust:
+The command takes a structural sample of at most 256 KiB from regular files and
+returns a value-free profile: container kind, sampling limits, truncation state,
+and observed field paths with JSON types. It never returns scalar values or
+copies sample records into the plugin. An agent uses that bounded evidence before
+inspecting only the representative records needed to edit the adapter. With
+`--json`, the command also returns generated files, `review_required: true`,
+and exact next commands. The user reviews the executable files before trust:
 
 ```bash
 rlviz plugin trust --json .rlviz/plugins/my-format

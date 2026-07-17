@@ -75,9 +75,12 @@ not make it trusted on another machine.
 
 `plugin init --json` returns a versioned plan with the resolved source shape,
 deterministic generated-file list, `review_required: true`, and exact trust,
-validate, and open commands. `--from` validates and describes the source but
-does not read its contents or copy a sample into the plugin. A missing source or
-analyzer use of `--from` fails before any scaffold files are created.
+validate, and open commands. For regular files, `source.profile` describes at
+most 256 KiB using only container kind, bounds, truncation state, and observed
+field paths with JSON types. It never includes scalar values or copies a sample
+into the plugin. The profile is structural evidence, not a complete schema. A
+missing source, unreadable profile, or analyzer use of `--from` fails before any
+scaffold files are created.
 
 ## Project layout
 

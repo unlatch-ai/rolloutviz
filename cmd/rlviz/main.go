@@ -18,6 +18,7 @@ import (
 	"github.com/unlatch-ai/rlviz/internal/app"
 	"github.com/unlatch-ai/rlviz/internal/daemon"
 	"github.com/unlatch-ai/rlviz/internal/plugins"
+	"github.com/unlatch-ai/rlviz/internal/plugins/sourceprofile"
 )
 
 var version = "0.0.0-dev"
@@ -37,9 +38,10 @@ type openResult struct {
 }
 
 type pluginInitSource struct {
-	Path      string `json:"path"`
-	Kind      string `json:"kind"`
-	SizeBytes int64  `json:"size_bytes"`
+	Path      string                 `json:"path"`
+	Kind      string                 `json:"kind"`
+	SizeBytes int64                  `json:"size_bytes"`
+	Profile   *sourceprofile.Profile `json:"profile,omitempty"`
 }
 
 type pluginInitResult struct {
@@ -471,6 +473,13 @@ func initPlugin(destination, name, kind, from string) (pluginInitResult, error) 
 			return pluginInitResult{}, fmt.Errorf("inspect source: %w", err)
 		}
 		result.Source = &pluginInitSource{Path: request.Source.Path, Kind: request.Source.Kind, SizeBytes: request.Source.SizeBytes}
+		if request.Source.Kind == "file" {
+			profile, err := sourceprofile.ProfileFile(request.Source.Path, sourceprofile.Limits{})
+			if err != nil {
+				return pluginInitResult{}, fmt.Errorf("profile source: %w", err)
+			}
+			result.Source.Profile = &profile
+		}
 	}
 	absolute, err := filepath.Abs(destination)
 	if err != nil {

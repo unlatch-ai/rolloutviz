@@ -24,9 +24,11 @@ fields or rewrite the source to make it look supported.
 rlviz plugin init --json --type adapter --lang python --from "<source>" .rlviz/plugins/<name>
 ```
 
-Inspect representative source records and edit only the generated adapter. Map
-them to the canonical `rlviz.dev/v1alpha1` records. Keep IDs stable, preserve
-event order, and include source line or byte locations when available.
+Read `source.profile` from the JSON result first. It is a bounded, value-free
+map of observed field paths and JSON types, not a complete schema. Then inspect
+only the representative source records needed. Edit only the generated adapter
+and map them to canonical `rlviz.dev/v1alpha1` records. Keep IDs stable,
+preserve event order, and include source line or byte locations when available.
 
 Before `plugin trust`, review the manifest and every executable file in the
 adapter directory, summarize what will execute, and get the user's explicit

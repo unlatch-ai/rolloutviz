@@ -47,6 +47,7 @@ operate the CLI and can author project-local adapters; RLViz remains the viewer.
 | `internal/daemon` | Detached process lifecycle, metadata, authentication token, private runtime paths |
 | `internal/index` | SQLite schema, bounded writes, queries, metrics, analyzer cache |
 | `internal/plugins` | Manifest validation, trust store, verified snapshots, adapter/analyzer process host |
+| `internal/plugins/sourceprofile` | Bounded, value-free source structure profiling for adapter onboarding |
 | `internal/analyzers` | Built-in deterministic findings and analyzer protocol |
 | `internal/alignment` | Behavioral fingerprints, compact paths, deterministic pair alignment |
 | `internal/server` | Loopback API, source registry, artifact policy, embedded UI routes |
@@ -112,6 +113,16 @@ manifest -> schema validation -> path and digest trust check
 
 Stdout is protocol-only. Stderr is captured for diagnostics. Any plugin edit
 changes the digest and invalidates trust.
+
+### Profile an unsupported source
+
+`inspect --json` and `plugin init --json --from` can profile regular files for
+adapter authoring. The profiler takes a sample of at most 256 KiB, bounds depth,
+paths, and array sampling, and emits only container classification plus
+field-path/type observations. It does not return scalar values or sample records.
+Profiles are deterministic but intentionally incomplete; agents must treat them
+as a work-order hint rather than a source schema. Profiling never executes
+source content.
 
 ## Canonical and derived data
 

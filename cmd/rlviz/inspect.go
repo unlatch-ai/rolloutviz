@@ -14,6 +14,7 @@ import (
 	"github.com/unlatch-ai/rlviz/internal/app"
 	"github.com/unlatch-ai/rlviz/internal/model"
 	"github.com/unlatch-ai/rlviz/internal/plugins"
+	"github.com/unlatch-ai/rlviz/internal/plugins/sourceprofile"
 )
 
 const (
@@ -22,8 +23,9 @@ const (
 )
 
 type inspectShape struct {
-	Kind      string `json:"kind"`
-	SizeBytes int64  `json:"size_bytes"`
+	Kind      string                 `json:"kind"`
+	SizeBytes int64                  `json:"size_bytes"`
+	Profile   *sourceprofile.Profile `json:"profile,omitempty"`
 }
 
 type inspectAdapter struct {
@@ -83,7 +85,22 @@ func inspectSource(ctx context.Context, sourcePath, adapterPath string, trust *p
 		Warnings: []string{},
 	}
 	if adapterPath == "" {
-		return inspectCanonical(result)
+		result, err = inspectCanonical(result)
+		if err != nil || result.Supported || result.Shape.Kind != "file" {
+			return result, err
+		}
+		profile, profileErr := sourceprofile.ProfileFile(result.Path, sourceprofile.Limits{})
+		if profileErr != nil {
+			return inspectResult{}, fmt.Errorf("profile source: %w", profileErr)
+		}
+		result.Shape.Profile = &profile
+		switch profile.Kind {
+		case sourceprofile.KindJSONObject:
+			result.Reason = "source is a JSON object document, not canonical NDJSON"
+		case sourceprofile.KindJSONArray:
+			result.Reason = "source is a JSON array document, not canonical NDJSON"
+		}
+		return result, nil
 	}
 
 	plugin, err := plugins.Load(adapterPath)
@@ -243,6 +260,13 @@ func formatInspectText(result inspectResult) string {
 		fmt.Sprintf("Shape:  %s, %d bytes", result.Shape.Kind, result.Shape.SizeBytes),
 		fmt.Sprintf("Result: %s", status),
 		fmt.Sprintf("Reason: %s", result.Reason),
+	}
+	if profile := result.Shape.Profile; profile != nil {
+		bounded := ""
+		if profile.Truncated {
+			bounded = ", truncated sample"
+		}
+		lines = append(lines, fmt.Sprintf("Profile: %s, %d field paths, %d/%d bytes sampled%s", profile.Kind, len(profile.Fields), profile.SampleBytes, profile.SourceBytes, bounded))
 	}
 	for _, warning := range result.Warnings {
 		lines = append(lines, "Warning: "+warning)

@@ -21,8 +21,10 @@ present. Otherwise create a project-local Python adapter:
 rlviz plugin init --json --type adapter --lang python --from "<source>" .rlviz/plugins/<name>
 ```
 
-Edit only the adapter. Map representative source records to
-`rlviz.dev/v1alpha1`, preserve order and stable IDs, and include source
+Read `source.profile` from the JSON result first. It is a bounded, value-free
+map of observed field paths and JSON types, not a complete schema. Then edit
+only the adapter and inspect only the representative records needed to map the
+source to `rlviz.dev/v1alpha1`. Preserve order and stable IDs, and include source
 locations when available. Fix adapter code using structured validator findings.
 Do not modify the source to make validation pass.
 

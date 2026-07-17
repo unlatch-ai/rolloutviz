@@ -186,10 +186,12 @@ additional representative real-format fixtures remain ongoing quality work.
 Status: rich demo, format inventory, bounded inspection, and version-matched
 agent setup are implemented for Codex, Claude Code, and Cursor. Setup writes
 are explicit and create-only. Source-aware adapter scaffolding now returns a
-versioned review plan without reading or copying trace contents. Bundled agent
-instructions enforce implementation and explicit review before trust, retain
-the source-aware `--from` handoff, and use JSON for every machine-operated
-command. JSON-mode setup usage errors use the stable diagnostic envelope.
+versioned review plan plus a bounded, value-free structural profile without
+copying sample records. Bundled agent instructions consume that profile before
+targeted source inspection, enforce implementation and explicit review before
+trust, retain the source-aware `--from` handoff, and use JSON for every
+machine-operated command. JSON-mode setup usage errors use the stable
+diagnostic envelope.
 
 ### Deliverables
 
@@ -211,9 +213,9 @@ command. JSON-mode setup usage errors use the stable diagnostic envelope.
 ## Milestone 10: research-grade trajectory reader
 
 Status: transcript, event timeline, outcome/evidence, selected-event-first
-details, semantic landmarks, context-change jump, and long-run virtualization
-are implemented. A full context-usage track and minimap require the next
-source-backed data-model work.
+details, semantic landmarks, sparse source-backed context track, context-change
+jump, and long-run virtualization are implemented. A whole-trajectory minimap
+and broader real-format context evidence remain future work.
 
 ### Deliverables
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/unlatch-ai/rlviz/internal/plugins"
+	"github.com/unlatch-ai/rlviz/internal/plugins/sourceprofile"
 )
 
 func TestInitPluginFromSourceReturnsAgentReadyPlan(t *testing.T) {
@@ -33,6 +35,9 @@ func TestInitPluginFromSourceReturnsAgentReadyPlan(t *testing.T) {
 	if result.Source == nil || result.Source.Path != resolvedSource || result.Source.Kind != "file" || result.Source.SizeBytes != 3 {
 		t.Fatalf("source=%#v", result.Source)
 	}
+	if result.Source.Profile == nil || result.Source.Profile.Kind != sourceprofile.KindJSONObject || result.Source.Profile.SampleBytes != 3 {
+		t.Fatalf("source profile=%#v", result.Source.Profile)
+	}
 	wantCommands := []string{
 		shellCommand("rlviz", "plugin", "trust", "--json", result.Path),
 		shellCommand("rlviz", "plugin", "validate", "--json", result.Path, resolvedSource),
@@ -40,6 +45,26 @@ func TestInitPluginFromSourceReturnsAgentReadyPlan(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result.NextCommands, wantCommands) {
 		t.Fatalf("next commands=%#v", result.NextCommands)
+	}
+}
+
+func TestInitPluginProfileDoesNotCopySourceValues(t *testing.T) {
+	root := t.TempDir()
+	secret := "customer-secret-value-9f2d"
+	source := filepath.Join(root, "private.json")
+	if err := os.WriteFile(source, []byte(`{"prompt":"`+secret+`","steps":[{"reward":0.75}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result, err := initPlugin(filepath.Join(root, "adapter"), "private", "adapter", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), secret) || strings.Contains(string(raw), "0.75") {
+		t.Fatalf("source values leaked into init plan: %s", raw)
 	}
 }
 

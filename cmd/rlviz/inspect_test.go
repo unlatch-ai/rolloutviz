@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/unlatch-ai/rlviz/internal/plugins"
+	"github.com/unlatch-ai/rlviz/internal/plugins/sourceprofile"
 )
 
 const canonicalPrefix = `{"record_type":"run","id":"run-test"}
@@ -63,6 +64,32 @@ func TestInspectCanonicalUnsupportedIsSuccessful(t *testing.T) {
 	}
 	if result.Supported || result.Confidence != 0 || result.Reason == "" || !strings.Contains(result.NextCommand, "plugin init") || !strings.Contains(result.NextCommand, "--from") || !strings.Contains(result.NextCommand, result.Path) {
 		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestInspectUnsupportedJSONIncludesValueFreeProfile(t *testing.T) {
+	secret := "private-prompt-32c1"
+	source := filepath.Join(t.TempDir(), "unknown.json")
+	if err := os.WriteFile(source, []byte(`{"prompt":"`+secret+`","events":[{"kind":"tool","score":1}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := inspectSource(context.Background(), source, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Supported || result.Shape.Profile == nil || result.Shape.Profile.Kind != sourceprofile.KindJSONObject {
+		t.Fatalf("result = %#v", result)
+	}
+	if result.Reason != "source is a JSON object document, not canonical NDJSON" {
+		t.Fatalf("reason = %q", result.Reason)
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), secret) {
+		t.Fatalf("inspect profile exposed source value: %s", raw)
 	}
 }
 
