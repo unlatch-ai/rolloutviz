@@ -31,6 +31,9 @@ jobs:
         run: golangci-lint run
       - run: make check
       - run: make web-e2e
+      - name: Verify Go browser core builds for WebAssembly
+        run: GOOS=js GOARCH=wasm go build ./internal/model ./internal/analyzers ./internal/alignment ./internal/browsercore
+      - run: make webapp-e2e
       - run: go test -race ./...
       - run: git diff --exit-code -- web/dist
       - run: make build

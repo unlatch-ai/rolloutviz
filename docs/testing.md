@@ -27,6 +27,8 @@ Useful focused targets are:
 make lint       # Go static analysis and formatting
 make test       # Go, Vitest, npm installer, and shell installer tests
 make web-e2e    # deterministic Playwright flows against the built viewer
+make webapp     # static app bundle, Go WASM binary, and local wasm_exec.js
+make webapp-e2e # bundled example through in-memory Browse -> Read
 make check      # full local release gate except Playwright
 ```
 
@@ -100,6 +102,8 @@ deep-link reveal, and Help focus return. Grow the suite toward five flows:
 4. Pair comparison reaches divergence, next change, and restores its URL.
 5. The packaged binary starts a daemon, serves an authenticated fixture, loads
    the browser UI, and stops cleanly.
+6. The static browser app loads its bundled 300-event example, transitions from
+   Browse to Read, and makes no request containing trace data.
 
 CLI unsupported-format and adapter diagnostics remain Go/process integration
 tests unless a browser surface is involved.

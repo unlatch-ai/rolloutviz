@@ -1,4 +1,4 @@
-.PHONY: build check clean dev format gallery lint site test web-build web-e2e web-install
+.PHONY: build check clean dev format gallery lint site test wasm-check webapp webapp-e2e webapp-install webapp-test web-build web-e2e web-install
 
 build: web-build
 	mkdir -p bin
@@ -6,6 +6,25 @@ build: web-build
 
 web-install:
 	npm --prefix web ci
+
+webapp-install:
+	@test -d web/node_modules || { echo "run make web-install first"; exit 1; }
+	@test -e webapp/node_modules || ln -s ../web/node_modules webapp/node_modules
+
+wasm-check:
+	GOOS=js GOARCH=wasm go build ./internal/model ./internal/analyzers ./internal/alignment ./internal/browsercore
+	GOOS=js GOARCH=wasm go build -o /tmp/rlviz-browser-core.wasm ./cmd/rlviz-wasm
+
+webapp: webapp-install
+	npm --prefix webapp run build
+	GOOS=js GOARCH=wasm go build -o webapp/dist/rlviz.wasm ./cmd/rlviz-wasm
+	cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" webapp/dist/wasm_exec.js
+
+webapp-test: webapp-install
+	npm --prefix webapp test
+
+webapp-e2e: webapp
+	npm --prefix webapp run test:e2e
 
 web-build:
 	npm --prefix web run build
@@ -23,6 +42,7 @@ test:
 	go test ./...
 	cd third_party/bubbletea && go test ./...
 	npm --prefix web test
+	$(MAKE) webapp-test
 	npm --prefix packages/npm test
 	./scripts/install_test.sh
 	./scripts/render_homebrew_formula_test.sh
@@ -44,8 +64,11 @@ check: lint
 	go test ./...
 	cd third_party/bubbletea && go test ./...
 	npm --prefix web test
+	$(MAKE) webapp-test
 	npm --prefix packages/npm test
 	npm --prefix web run build
+	$(MAKE) wasm-check
+	$(MAKE) webapp
 	./scripts/install_test.sh
 	./scripts/render_homebrew_formula_test.sh
 
@@ -53,4 +76,4 @@ dev:
 	npm --prefix web run dev
 
 clean:
-	rm -rf bin web/dist
+	rm -rf bin web/dist webapp/dist webapp/node_modules

@@ -222,3 +222,45 @@ narrow and reviewable:
 
 Run validation after every behavior change. A changed digest intentionally
 invalidates trust, even when the manifest version is unchanged.
+
+## Browser adapters
+
+The static viewer at [app.rlviz.dev](https://app.rlviz.dev) can run a
+user-supplied WebAssembly adapter without sending the adapter or trace to a
+server. Browser adapters are session-only: the user selects the module, reviews
+its byte size and SHA-256 digest, and confirms that exact module before its
+first run. The viewer never persists the module or its approval, so a new tab or
+session requires selection and confirmation again.
+
+A browser adapter is an import-free WebAssembly module with these exact exports:
+
+```text
+memory: WebAssembly.Memory
+rlviz_alloc(size: i32) -> i32
+rlviz_adapt(input_ptr: i32, input_len: i32) -> i32
+rlviz_result_len() -> i32
+rlviz_free(ptr: i32, len: i32)
+```
+
+The viewer allocates and copies the complete raw source into `memory`, then
+calls `rlviz_adapt`. The return value is a pointer to canonical NDJSON and
+`rlviz_result_len` is its byte length. Both buffers remain valid until the
+viewer calls `rlviz_free`. Adapter output is capped at 64 MiB and passes through
+the same strict canonical decoder and relationship validation as a built-in
+format before it reaches the viewer.
+
+Modules receive no imports, filesystem, DOM, cookies, storage, or network
+capability. This WebAssembly boundary is the browser adapter trust sandbox; it
+does not make the mapping correct, so the digest confirmation remains explicit.
+Recorded commands, HTML, and paths are still data and must never be executed.
+
+One-line release builds after implementing the exports are:
+
+```bash
+tinygo build -target wasm -o adapter.wasm .
+cargo build --release --target wasm32-unknown-unknown
+```
+
+The app's **adapter help** panel contains a copy-paste prompt for a local coding
+agent with this ABI, the canonical schema links, deterministic-ID rules, and
+fixture expectations.

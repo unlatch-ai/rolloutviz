@@ -54,6 +54,8 @@ operate the CLI and can author project-local adapters; RLViz remains the viewer.
 | `internal/watch` | Growing-file and replacement detection |
 | `web/src` | React viewer and typed API client |
 | `web/dist` | Generated production UI embedded by `web/embed.go` |
+| `webapp` | Separate static browser viewer for `app.rlviz.dev`; reuses `web/src` through the provider boundary |
+| `internal/browsercore` | WASM-safe normalization, validation, in-memory browse/read data, analysis, and comparison |
 | `schemas/v1alpha1` | Public canonical and plugin contracts |
 | `fixtures` | Canonical, malformed, adversarial, and protocol conformance data |
 | `examples` | Runnable adapters and deterministic public gallery traces |
@@ -62,6 +64,21 @@ operate the CLI and can author project-local adapters; RLViz remains the viewer.
 | `docs/adr` | Durable architectural decisions and their tradeoffs |
 
 ## Runtime paths
+
+### Open a source in the hosted browser viewer
+
+`app.rlviz.dev` is a separate static surface from the documentation site. The
+landing page reads a dropped or selected `File` into the current tab. A Go WASM
+core detects canonical NDJSON, Inspect AI EvalLog JSON, or Verifiers
+GenerateOutputs JSON, validates canonical records, and builds an in-memory
+collection. The shared React instrument consumes a `ViewerProvider`; the CLI
+uses the daemon HTTP provider and the static app uses the in-memory provider.
+Viewer components are not forked.
+
+The app makes no outbound request containing trace bytes. Its JavaScript, Go
+WASM runtime, WASM binary, and examples are local static build assets, with no
+CDN dependencies. Uploaded browser adapters execute only after an explicit
+SHA-256 and size confirmation and are never persisted.
 
 ### Open a source
 
@@ -202,6 +219,7 @@ structured observation from absent data. The indexed events API accepts strict
 - Bind only to loopback.
 - Require the per-daemon secret for source registration and data reads.
 - Make no outbound requests during normal viewing.
+- Never send browser-viewer trace bytes or uploaded adapter bytes in a request.
 - Treat rollout sources and referenced data as read-only.
 - Resolve symlinks and prevent artifact reads outside registered roots.
 - Render trace HTML as text or sanitized content, never trusted markup.

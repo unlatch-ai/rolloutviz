@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { loadAnalysis, loadBrowse, loadComparison, loadIndexedTrajectory, loadTrajectory } from "./api";
+import { daemonProvider } from "./provider";
+import type { ViewerProvider } from "./provider";
 import { bindingLabel, commandIds, commands, useCommands, useKeymapRevision } from "./commands";
 import { attentionScore, axisX, firstAnomaly, glyphForKind, panWindowToInclude, stagesFor, stageChanged, verdictGlyph, zoomWindow } from "./instrument";
 import type { Stage } from "./instrument";
@@ -284,7 +285,7 @@ function Compare({ comparison, help, onBack, setHelp }: { comparison: Comparison
   </main>;
 }
 
-export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
+export function App({ initialTrajectory, provider = daemonProvider }: { initialTrajectory?: Trajectory; provider?: ViewerProvider }) {
   useKeymapRevision();
   const [mode, setMode] = useState<Mode>("browse");
   const [browse, setBrowse] = useState<BrowseResponse>(() => fakeBrowse(initialTrajectory ?? sampleTrajectory));
@@ -318,7 +319,7 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
     if (initialTrajectory) return;
     const controller = new AbortController();
     setError("");
-    Promise.all([loadTrajectory(controller.signal), loadBrowse(controller.signal)]).then(([loaded, collection]) => {
+    Promise.all([provider.loadInitial(controller.signal), provider.loadBrowse(controller.signal)]).then(([loaded, collection]) => {
 	  setBrowse(collection);
 	  if (activeRow.current) return;
 	  setTrajectory(loaded.trajectory); setPresentation(loaded.presentation);
@@ -330,7 +331,7 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
 	  setError(reason instanceof Error ? reason.message : "Could not load viewer");
 	});
     return () => controller.abort();
-  }, [initialTrajectory, bootAttempt]);
+  }, [initialTrajectory, bootAttempt, provider]);
 
   // A hash-only navigation is same-document: no reload, so the boot effect
   // would never re-run. Pasting a fresh `#token=` URL into a dead tab must
@@ -358,14 +359,14 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
     activeRow.current = rowID;
     loading.current = true; setError("");
     try {
-      const loaded = row.source_id === "sample" ? { trajectory, isSample: true, presentation: undefined } : await loadIndexedTrajectory(row.source_id, row.trajectory.id);
+      const loaded = row.source_id === "sample" ? { trajectory, isSample: true, presentation: undefined } : await provider.loadTrajectory(row.source_id, row.trajectory.id);
 	  if (requestID !== openRequest.current || activeRow.current !== rowID) return;
       setTrajectory(loaded.trajectory); setPresentation(loaded.presentation); setAnalysis(null);
       const anomaly = firstAnomaly(loaded.trajectory); setSelected(anomaly); setHover(undefined);
 	  const initialSelectionRevision = selectionRevision.current;
       setAxis({ start: loaded.trajectory.events[0].sequence, end: loaded.trajectory.events.at(-1)!.sequence });
       setMode("read");
-      if (row.source_id !== "sample") loadAnalysis(row.source_id, row.trajectory.id).then((result) => {
+      if (row.source_id !== "sample") provider.loadAnalysis(row.source_id, row.trajectory.id).then((result) => {
 		if (activeRow.current !== rowID || requestID !== openRequest.current) return;
 		setAnalysis(result);
 		if (selectionRevision.current === initialSelectionRevision) setSelected(firstAnomaly(loaded.trajectory, result));
@@ -390,7 +391,7 @@ export function App({ initialTrajectory }: { initialTrajectory?: Trajectory }) {
     if (pair.length !== 2) return;
     const left = ordered.find((row) => row.trajectory.id === pair[0]), right = ordered.find((row) => row.trajectory.id === pair[1]);
     if (!left || !right || left.source_id !== right.source_id) { setError("Pair Compare requires two trajectories from one indexed source"); return; }
-    try { setComparison(await loadComparison(left.source_id, left.trajectory.id, right.trajectory.id)); setMode("compare"); }
+    try { setComparison(await provider.loadComparison(left.source_id, left.trajectory.id, right.trajectory.id)); setMode("compare"); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Could not compare trajectories"); }
   };
   const nextRollout = (delta: number) => {
