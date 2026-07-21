@@ -26,6 +26,7 @@ var pages = []page{
 	{Title: "Interaction spec", Description: "Keyboard-first interaction model and visual semantics for the browser and TUI.", Source: "docs/interaction-spec.md", Output: "interaction-spec.html"},
 	{Title: "Onboarding", Description: "Setup, diagnostics, format inspection, and first-run workflows.", Source: "docs/onboarding.md", Output: "onboarding.html"},
 	{Title: "Adapter authoring", Description: "Safe workflow for building, trusting, validating, and using source adapters.", Source: "docs/adapter-authoring.md", Output: "adapter-authoring.html"},
+	{Title: "Data model", Description: "Canonical records emitted by built-in and user-authored adapters.", Source: "docs/data-model.md", Output: "data-model.html"},
 }
 
 const siteURL = "https://rlviz.dev"
@@ -70,12 +71,17 @@ func build(output string) error {
 	if err != nil {
 		return fmt.Errorf("read installer for site: %w", err)
 	}
+	vercelConfig, err := os.ReadFile("site/vercel.json")
+	if err != nil {
+		return fmt.Errorf("read Vercel config for site: %w", err)
+	}
 	artifacts := map[string][]byte{
 		"install.sh":    installer,
 		"CNAME":         []byte("rlviz.dev"),
 		"llms.txt":      []byte(llmsManifest()),
 		"llms-full.txt": []byte(llmsFull(contents)),
 		"style.css":     []byte(styles),
+		"vercel.json":   vercelConfig,
 	}
 	for name, content := range artifacts {
 		if err := os.WriteFile(filepath.Join(output, name), content, 0o644); err != nil {
@@ -128,6 +134,7 @@ func layout(current page, body string) string {
 		}
 		fmt.Fprintf(&navigation, `<a href="%s"%s>%s</a>`, candidate.Output, class, html.EscapeString(candidate.Title))
 	}
+	navigation.WriteString(`<a class="viewer-link" href="https://app.rlviz.dev">Open the viewer → app.rlviz.dev</a>`)
 	return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"color-scheme\" content=\"dark\"><title>" + html.EscapeString(current.Title) + " · RLViz</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><aside><a class=\"brand\" href=\"index.html\"><b>RLViz</b></a><nav>" + navigation.String() + "</nav><footer>local-first · source-read-only</footer></aside><main>" + body + "</main></body></html>"
 }
 

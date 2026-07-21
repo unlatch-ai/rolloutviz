@@ -93,6 +93,20 @@ A viewer-created selection of trajectories, potentially across runs, checkpoints
 
 ## MVP user experience
 
+### Open in the browser without installing
+
+The separate static app at `app.rlviz.dev` opens local traces without an
+account or upload. Its landing promise is literal: **your trace is parsed in
+this tab and never uploaded**. It shares the instrument viewer with the CLI,
+but uses a Go WebAssembly core and an in-memory collection instead of the local
+daemon and SQLite index.
+
+The browser viewer is for individual files and modest cohorts. The UI and Go
+core both refuse files above 32 MiB with a CLI next step because the raw bytes,
+canonical output, and browse index coexist in tab memory. The 300-event gallery
+trace is a required build and browser test fixture. Private formats and large
+cohorts remain the full CLI's job.
+
 ### Installation
 
 Users download a release binary or install it through a package manager.

@@ -13,6 +13,10 @@ structure.
 
 ## 1. Modes
 
+The rack and arrangement model in `workspace-spec.md` supersedes this section's
+top-level mode swaps. The mode descriptions below remain vocabulary for the
+equivalent Browse, Read, and Compare arrangements.
+
 Three modes, one overlay class. No other top-level surfaces.
 
 - **Browse** — home: everything the daemon knows (sources, runs, cases,
@@ -156,7 +160,9 @@ Keep existing bindings. Additions (conflict-checked per scope):
 | `trajectory.pivotAggregate` | `.` | trajectory |
 | `trajectory.dropMarker` / `cycleMarkers` | `m` / `Shift+M` | trajectory |
 | `view.fidelityUp` / `fidelityDown` | `]` / `[` | all |
+| `view.fidelityUpAll` / `fidelityDownAll` | `}` / `{` | workspace |
 | `view.zoomIn` / `zoomOut` / `zoomFit` | `+` / `-` / `0` | trajectory, comparison |
+| `view.zoomInAll` / `zoomOutAll` / `zoomFitAll` | `>` / `<` / `)` | workspace |
 | `group.tagVerdict*` | `1..4` | group |
 | `comparison.toggleDivergenceCurve` | `Shift+D` | comparison |
 

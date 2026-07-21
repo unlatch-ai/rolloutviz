@@ -14,6 +14,16 @@ record.
 
 The smallest examples are under `fixtures/canonical/`.
 
+The static browser viewer also includes pure-Go in-browser mappings for the
+documented JSON shapes below:
+
+- Inspect AI EvalLog JSON version 2 (not `.eval` archives)
+- Prime Intellect Verifiers GenerateOutputs JSON
+
+Those mappings compile into the local Go WASM core. The CLI versions remain
+reference process adapters until promoted separately; this distinction is
+reported literally by each surface.
+
 ## Example adapter
 
 ### Simple JSONL

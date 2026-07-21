@@ -1,6 +1,13 @@
 /bin/
+/build/
 /dist/
+/node_modules/
 /web/node_modules/
+/webapp/node_modules
+/webapp/dist/
+/webapp/*.tsbuildinfo
+/webapp/src/*.tsbuildinfo
+/webapp/test-results/
 /web/*.tsbuildinfo
 /web/src/*.tsbuildinfo
 /site/dist/

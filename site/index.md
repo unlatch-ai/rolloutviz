@@ -4,6 +4,8 @@ Visualize and compare agent rollouts locally.
 
 RLViz opens canonical trajectories, rollout cohorts, and trusted adapter output in a keyboard-first browser UI or TUI. It reads sources without mutating them and makes no outbound requests during viewing.
 
+Open a local trace without installing anything at [app.rlviz.dev](https://app.rlviz.dev). Your trace is parsed in that tab and never uploaded.
+
 ## Install
 
 ```bash
