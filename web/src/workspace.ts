@@ -3,6 +3,7 @@ export type WorkspaceDirection = "rows" | "columns";
 export type WorkspaceTarget = "rail" | string;
 
 export interface AxisWindow { start: number; end: number }
+export interface LaneDepthSnapshot { depth: number; axis: AxisWindow }
 
 export interface WorkspaceLane {
   id: string;
@@ -13,6 +14,12 @@ export interface WorkspaceLane {
   depth: number;
   fidelity: number;
   axis: AxisWindow;
+  descentStack: LaneDepthSnapshot[];
+}
+
+/** Context lanes render Surface without discarding the focus lane's stored depth. */
+export function effectiveDepth(lane: WorkspaceLane): number {
+  return lane.band === "context" ? 1 : lane.depth;
 }
 
 export interface SeamRatios {
@@ -67,6 +74,12 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | undefined {
     const lane = candidate as Partial<WorkspaceLane>;
     if (typeof lane.sourceId !== "string" || typeof lane.trajectoryId !== "string" || (lane.band !== "focus" && lane.band !== "context")) return [];
     const axis = lane.axis && finite(lane.axis.start) && finite(lane.axis.end) && lane.axis.end >= lane.axis.start ? lane.axis : { start: 0, end: 1 };
+    const descentStack = Array.isArray(lane.descentStack) ? lane.descentStack.flatMap((candidate) => {
+      if (!candidate || typeof candidate !== "object") return [];
+      const snapshot = candidate as Partial<LaneDepthSnapshot>;
+      if (!finite(snapshot.depth) || !snapshot.axis || !finite(snapshot.axis.start) || !finite(snapshot.axis.end) || snapshot.axis.end < snapshot.axis.start) return [];
+      return [{ depth: clamp(Math.round(snapshot.depth), 1, 3), axis: snapshot.axis }];
+    }).slice(-3) : [];
     const id = laneId(lane.sourceId, lane.trajectoryId);
     if (seen.has(id)) return [];
     seen.add(id);
@@ -74,7 +87,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | undefined {
       id, sourceId: lane.sourceId, trajectoryId: lane.trajectoryId, band: lane.band,
       selected: clamp(finite(lane.selected) ? Math.round(lane.selected) : 0, 0, Number.MAX_SAFE_INTEGER),
       depth: clamp(finite(lane.depth) ? Math.round(lane.depth) : 1, 1, 4),
-      fidelity: clamp(finite(lane.fidelity) ? Math.round(lane.fidelity) : 3, 0, 5), axis,
+      fidelity: clamp(finite(lane.fidelity) ? Math.round(lane.fidelity) : 3, 0, 5), axis, descentStack,
     } satisfies WorkspaceLane];
   });
   // A restored malformed link cannot overfill the focus band.
@@ -132,7 +145,7 @@ export function legacyWorkspace(search: string): WorkspaceState | undefined {
   const workspace = emptyWorkspace();
   const ids = left && right ? [left, right] : [trajectoryId!];
   workspace.railExpanded = false;
-  workspace.lanes = ids.map((id) => ({ id: laneId(sourceId, id), sourceId, trajectoryId: id, band: "focus", selected: 0, depth: 1, fidelity: 3, axis: { start: 0, end: 1 } }));
+  workspace.lanes = ids.map((id) => ({ id: laneId(sourceId, id), sourceId, trajectoryId: id, band: "focus", selected: 0, depth: 1, fidelity: 3, axis: { start: 0, end: 1 }, descentStack: [] }));
   workspace.active = workspace.lanes[0].id;
   if (ids.length === 2) workspace.reference = workspace.lanes[0].id;
   return workspace;

@@ -87,6 +87,10 @@ counter):
 - `Enter`/`Esc` are the keyboard equivalents of the click grammar. Anchor
   stability holds across every transition.
 - Context-band lanes always render Surface regardless of their stored depth.
+  Promoting one back to focus restores that stored depth.
+- Every descent stores its pre-descent axis with the prior depth. Ascent
+  restores the axis you descended from; strip-click and `Esc` are identical,
+  and jumplist snapshots include the full descent stack.
 - With a reference pinned, stage anchors draw as vertical alignment lines
   across all lanes (including context lanes' tick marks).
 

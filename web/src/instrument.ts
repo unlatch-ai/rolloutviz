@@ -87,10 +87,13 @@ export function episodesFor(events: TrajectoryEvent[]): Episode[] {
       starts.push({ index, key: `inferred:${index}`, label });
     });
   }
+  const occurrences = new Map<string, number>();
   return starts.map((start, index) => {
     const endIndex = (starts[index + 1]?.index ?? events.length) - 1;
+    const occurrence = (occurrences.get(start.key) ?? 0) + 1;
+    occurrences.set(start.key, occurrence);
     return {
-      key: start.key,
+      key: `${start.key}#${occurrence}`,
       label: start.label,
       startIndex: start.index,
       endIndex,

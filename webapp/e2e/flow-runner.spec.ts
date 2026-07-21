@@ -69,16 +69,18 @@ async function observe(page: Page, observable: Observable, boxes: Map<string, Aw
   const locator = target(page, observable);
   if (observable.absent) return expect(locator).toHaveCount(0);
   if (observable.count !== undefined) return expect(locator).toHaveCount(observable.count);
-  await expect(locator).toBeVisible();
-  if (observable.attribute && observable.equals !== undefined) await expect(locator).toHaveAttribute(observable.attribute, observable.equals);
-  if (observable.attribute && observable.notEquals !== undefined) await expect(locator).not.toHaveAttribute(observable.attribute, observable.notEquals);
-  if (observable.attribute && observable.contains !== undefined) await expect(locator).toHaveAttribute(observable.attribute, new RegExp(observable.contains));
+  await expect(locator.first()).toBeVisible();
+  if (observable.attribute && observable.equals !== undefined) await expect(locator.first()).toHaveAttribute(observable.attribute, observable.equals);
+  if (observable.attribute && observable.notEquals !== undefined) await expect(locator.first()).not.toHaveAttribute(observable.attribute, observable.notEquals);
+  if (observable.attribute && observable.contains !== undefined) await expect(locator.first()).toHaveAttribute(observable.attribute, new RegExp(observable.contains));
   if (!observable.attribute && observable.equals !== undefined) await expect(locator).toHaveText(observable.equals);
-  if (!observable.attribute && observable.contains !== undefined) await expect(locator).toContainText(observable.contains);
+  if (!observable.attribute && observable.contains !== undefined) await expect(locator.first()).toContainText(observable.contains);
   if (observable.boxEquals) expect(await locator.first().boundingBox()).toEqual(boxes.get(observable.boxEquals));
   if (observable.boxNotEquals) expect(await locator.first().boundingBox()).not.toEqual(boxes.get(observable.boxNotEquals));
   if (observable.attribute && observable.attributeEqualsCapture) expect(await locator.first().getAttribute(observable.attribute)).toBe(attributes.get(observable.attributeEqualsCapture));
   if (observable.attribute && observable.attributeNotEqualsCapture) expect(await locator.first().getAttribute(observable.attribute)).not.toBe(attributes.get(observable.attributeNotEqualsCapture));
+  if (observable.attribute && observable.attributeNumberLte !== undefined) expect(Number(await locator.first().getAttribute(observable.attribute))).toBeLessThanOrEqual(observable.attributeNumberLte);
+  if (observable.attribute && observable.attributeNumberGte !== undefined) expect(Number(await locator.first().getAttribute(observable.attribute))).toBeGreaterThanOrEqual(observable.attributeNumberGte);
 }
 
 for (const flow of flows.filter((item) => item.surfaces.includes("webapp"))) {

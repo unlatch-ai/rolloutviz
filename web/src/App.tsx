@@ -10,7 +10,7 @@ import { preview, title } from "./format";
 import { sampleTrajectory } from "./sample";
 import { applyPresentationTheme } from "./presentation";
 import type { PresentationConfig } from "./types";
-import { defaultSeams, emptyWorkspace, laneId, legacyWorkspace, normalizeWorkspace, snapshotLabel, workspaceFromSearch, workspaceStorageKey, workspaceURL } from "./workspace";
+import { defaultSeams, effectiveDepth, emptyWorkspace, laneId, legacyWorkspace, normalizeWorkspace, snapshotLabel, workspaceFromSearch, workspaceStorageKey, workspaceURL } from "./workspace";
 import type { SeamRatios, WorkspaceLane, WorkspaceState } from "./workspace";
 import { VirtualList } from "./VirtualList";
 
@@ -102,8 +102,7 @@ function ShapeStrip({ trajectory, selected, hover, axis, compact = false, label,
   const min = events[0]?.sequence ?? 0, max = events.at(-1)?.sequence ?? min + 1;
   const x = (sequence: number) => axisX(sequence, axis);
   const visible = events.map((event, index) => ({ event, index })).filter(({ event }) => event.sequence >= axis.start && event.sequence <= axis.end);
-  const explicit = events.map((event, index) => ({ event, index })).filter(({ event }) => event.alignment_key?.startsWith("episode:") || event.alignment_key?.startsWith("stage:"));
-  const bands = explicit.length ? explicit.map(({ event, index }, n) => ({ label: event.alignment_key!.split(":").slice(1).join(":"), start: event.sequence, end: explicit[n + 1]?.event.sequence ?? max, index })) : [{ label: "outcome", start: min, end: max, index: 0 }];
+  const bands = episodesFor(events);
   const rewards: Array<{ x: number; value: number }> = []; let reward = 0;
   visible.forEach(({ event }) => { reward = eventReward(event) ?? reward; rewards.push({ x: x(event.sequence), value: reward }); });
   const rewardMin = Math.min(0, ...rewards.map((point) => point.value)), rewardMax = Math.max(1, ...rewards.map((point) => point.value));
@@ -114,7 +113,7 @@ function ShapeStrip({ trajectory, selected, hover, axis, compact = false, label,
       const rect = pointer.currentTarget.getBoundingClientRect(); const px = ((pointer.clientX - rect.left) / Math.max(1, rect.width)) * 1000;
       const nearest = visible.reduce((best, item) => Math.abs(x(item.event.sequence) - px) < Math.abs(x(events[best]?.sequence ?? min) - px) ? item.index : best, visible[0]?.index ?? 0); onHover(nearest);
     }} onClick={() => onAscend ? onAscend() : hover !== undefined && onSelect(hover)}>
-      {!compact && <><text className="lane-label" x="20" y="13">episodes</text>{bands.filter((band) => band.end >= axis.start && band.start <= axis.end).map((band) => <g key={`${band.label}:${band.start}`}><rect className="episode-band" x={x(Math.max(axis.start, band.start))} y="18" width={Math.max(1, x(Math.min(axis.end, band.end)) - x(Math.max(axis.start, band.start)))} height="23" /><text className="episode-label" x={x(Math.max(axis.start, band.start)) + 4} y="34">{band.label}</text></g>)}</>}
+      {!compact && <><text className="lane-label" x="20" y="13">episodes</text>{bands.filter((band) => band.end >= axis.start && band.start <= axis.end).map((band) => <g key={band.key} data-episode-key={band.key} data-episode-start={band.start} data-episode-end={band.end}><rect className="episode-band" x={x(Math.max(axis.start, band.start))} y="18" width={Math.max(1, x(Math.min(axis.end, band.end)) - x(Math.max(axis.start, band.start)))} height="23" /><text className="episode-label" x={x(Math.max(axis.start, band.start)) + 4} y="34">{band.label}</text></g>)}</>}
       <text className="lane-label" x="20" y={compact ? 34 : 61}>events</text>
       {visible.map(({ event, index }) => { const px = x(event.sequence), offset = compact ? -45 : 0;
         if (event.kind === "error") return <path data-event-index={index} key={event.id} className="event-shape error" d={`M${px - 5},${105 + offset} L${px},${88 + offset} L${px + 5},${105 + offset} Z`} />;
@@ -139,7 +138,7 @@ function EpisodeStrip({ trajectory, lane, episodes, selectedEpisode, onDescend }
         const nextStart = episodes[actualIndex + 1]?.start ?? Math.max(episode.end + 1, lane.axis.end);
         const left = x(Math.max(lane.axis.start, episode.start)) / 10;
         const right = x(Math.min(lane.axis.end, nextStart)) / 10;
-        return <button key={episode.key} className={`episode-button ${actualIndex === selectedEpisode ? "selected" : ""}`} data-episode-index={actualIndex} data-episode-key={episode.key} style={{ left: `${left}%`, width: `${Math.max(0.8, right - left)}%` }} onClick={(event) => { event.stopPropagation(); onDescend(episode); }}>
+        return <button key={episode.key} className={`episode-button ${actualIndex === selectedEpisode ? "selected" : ""}`} data-episode-index={actualIndex} data-episode-key={episode.key} data-episode-start={episode.start} data-episode-end={episode.end} style={{ left: `${left}%`, width: `${Math.max(0.8, right - left)}%` }} onClick={(event) => { event.stopPropagation(); onDescend(episode); }}>
           <b>{episode.label}</b><small>{episode.inferred ? "inferred" : "adapter"} · {episode.endIndex - episode.startIndex + 1} events</small>
         </button>;
       })}
@@ -170,7 +169,7 @@ function LaneTrack({ lane, data, active, reference, hover, onActivate, onSelect,
   lane: WorkspaceLane; data?: LaneData; active: boolean; reference: boolean; hover?: number; onActivate: () => void; onSelect: (index: number) => void; onHover: (index?: number) => void; onDescend: (episode?: Episode) => void; onAscend: () => void;
 }) {
   const trajectory = data?.trajectory;
-  const depth = lane.band === "context" ? 1 : lane.depth;
+  const depth = effectiveDepth(lane);
   const selected = trajectory ? Math.min(lane.selected, trajectory.events.length - 1) : 0;
   const episodes = trajectory ? episodesFor(trajectory.events) : [];
   const selectedEpisode = episodeIndexForEvent(episodes, selected);
@@ -323,7 +322,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
       if (sourceId) putLaneData(laneId(sourceId, loaded.trajectory.id), { trajectory: loaded.trajectory, analysis: null, presentation: loaded.presentation });
       if (sourceId && legacyReadIntent.current && !workspaceRef.current.lanes.length) {
         const id = laneId(sourceId, loaded.trajectory.id);
-        applyWorkspace({ ...workspaceRef.current, railExpanded: false, active: id, lanes: [{ id, sourceId, trajectoryId: loaded.trajectory.id, band: "focus", selected: firstAnomaly(loaded.trajectory), depth: 1, fidelity: 3, axis: { start: loaded.trajectory.events[0]?.sequence ?? 0, end: loaded.trajectory.events.at(-1)?.sequence ?? 1 } }] }, false);
+        applyWorkspace({ ...workspaceRef.current, railExpanded: false, active: id, lanes: [{ id, sourceId, trajectoryId: loaded.trajectory.id, band: "focus", selected: firstAnomaly(loaded.trajectory), depth: 1, fidelity: 3, axis: { start: loaded.trajectory.events[0]?.sequence ?? 0, end: loaded.trajectory.events.at(-1)?.sequence ?? 1 }, descentStack: [] }] }, false);
       }
       workspaceRef.current.lanes.forEach((lane) => void ensureLaneData(lane));
     }).catch((reason) => { if (!controller.signal.aborted && !(reason instanceof Error && reason.name === "AbortError")) setError(reason instanceof Error ? reason.message : "Could not load viewer"); });
@@ -355,7 +354,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
     const loaded = row.source_id === "sample" ? { trajectory: initialTrajectory ?? sampleTrajectory, presentation: undefined } : await provider.loadTrajectory(row.source_id, row.trajectory.id);
     const focus = workspaceRef.current.lanes.filter((lane) => lane.band === "focus");
     const band = add && focus.length >= 2 ? "context" : "focus";
-    const base: WorkspaceLane = { id, sourceId: row.source_id, trajectoryId: row.trajectory.id, band, selected: preserve?.selected ?? firstAnomaly(loaded.trajectory), depth: preserve?.depth ?? 1, fidelity: preserve?.fidelity ?? 3, axis: preserve?.axis ?? { start: loaded.trajectory.events[0]?.sequence ?? 0, end: loaded.trajectory.events.at(-1)?.sequence ?? 1 } };
+    const base: WorkspaceLane = { id, sourceId: row.source_id, trajectoryId: row.trajectory.id, band, selected: preserve?.selected ?? firstAnomaly(loaded.trajectory), depth: preserve?.depth ?? 1, fidelity: preserve?.fidelity ?? 3, axis: preserve?.axis ?? { start: loaded.trajectory.events[0]?.sequence ?? 0, end: loaded.trajectory.events.at(-1)?.sequence ?? 1 }, descentStack: preserve?.descentStack ?? [] };
     putLaneData(id, { trajectory: loaded.trajectory, analysis: null, presentation: loaded.presentation });
     change((current) => {
       if (add || !current.lanes.length) return { ...current, lanes: [...current.lanes, base], active: id, railExpanded: current.railExpanded };
@@ -377,23 +376,34 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
   }, false), [updateLane]);
   const descendLane = useCallback((id: string, target?: Episode) => updateLane(id, (lane, data) => {
     if (lane.band === "context" || !data) return lane;
+    const depth = effectiveDepth(lane);
+    if (depth >= 4) return lane;
     const events = data.trajectory.events, episodes = episodesFor(events);
     const current = target ?? episodes[episodeIndexForEvent(episodes, lane.selected)];
     const selected = current && (lane.selected < current.startIndex || lane.selected > current.endIndex) ? current.startIndex : lane.selected;
     const sequence = events[selected]?.sequence ?? events[0]?.sequence ?? 0;
-    return { ...lane, selected, depth: Math.min(4, lane.depth + 1), axis: lane.depth === 2 && current ? episodeWindow(lane.axis, current, sequence) : lane.axis };
+    const min = events[0]?.sequence ?? 0, max = events.at(-1)?.sequence ?? 1;
+    const panned = panWindowToInclude(lane.axis, sequence, min, max);
+    const axis = depth === 2 && current ? episodeWindow(panned, current, sequence) : lane.axis;
+    return { ...lane, selected, depth: depth + 1, axis, descentStack: [...lane.descentStack, { depth, axis: lane.axis }] };
   }), [updateLane]);
-  const ascendLane = useCallback((id: string) => updateLane(id, (lane) => ({ ...lane, depth: Math.max(1, lane.depth - 1) })), [updateLane]);
+  const ascendLane = useCallback((id: string) => updateLane(id, (lane) => {
+    const depth = effectiveDepth(lane);
+    if (depth <= 1) return lane;
+    const snapshot = lane.descentStack.at(-1);
+    return { ...lane, depth: depth - 1, axis: snapshot?.axis ?? lane.axis, descentStack: lane.descentStack.slice(0, -1) };
+  }), [updateLane]);
   const moveEvent = (delta: number) => {
     if (!activeLane) return;
     const data = laneData.get(activeLane.id); if (!data) return;
     const events = data.trajectory.events, episodes = episodesFor(events), episodeIndex = episodeIndexForEvent(episodes, activeLane.selected);
-    if (activeLane.depth === 2) {
+    const depth = effectiveDepth(activeLane);
+    if (depth === 2) {
       const target = episodes[Math.max(0, Math.min(episodes.length - 1, episodeIndex + delta))];
       if (target) selectEvent(activeLane.id, target.startIndex);
       return;
     }
-    if (activeLane.depth >= 3) {
+    if (depth >= 3) {
       const episode = episodes[episodeIndex]; if (!episode) return;
       selectEvent(activeLane.id, Math.max(episode.startIndex, Math.min(episode.endIndex, activeLane.selected + delta)));
       return;
@@ -428,7 +438,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
     // Esc is structural (ascend, then close the lane, keeping current rail
     // state); history rewind is exclusively Ctrl+o, so backing out of a lane
     // never restores a stale rail selection.
-    [commandIds.workspace.ascend]: () => { if (resizeMode) { setResizeMode(false); return; } if (!activeLane) return false; if (activeLane.band === "focus" && activeLane.depth > 1) ascendLane(activeLane.id); else closeLane(); },
+    [commandIds.workspace.ascend]: () => { if (resizeMode) { setResizeMode(false); return; } if (!activeLane) return false; if (effectiveDepth(activeLane) > 1) ascendLane(activeLane.id); else closeLane(); },
     [commandIds.workspace.jumpBack]: () => jump(-1), [commandIds.workspace.jumpForward]: () => jump(1), [commandIds.workspace.resizeMode]: () => setResizeMode(true),
     [commandIds.view.fidelityUp]: () => adjustFidelity(1, false), [commandIds.view.fidelityDown]: () => adjustFidelity(-1, false),
     [commandIds.view.fidelityUpAll]: () => adjustFidelity(1, true), [commandIds.view.fidelityDownAll]: () => adjustFidelity(-1, true),

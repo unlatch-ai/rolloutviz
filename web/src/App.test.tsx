@@ -64,6 +64,65 @@ describe("instrument viewer", () => {
     expect(screen.getByRole("region", { name: "Trajectory shape" })).toHaveAttribute("data-selected-x", surfaceAnchor!);
   });
 
+  it("registers identical episode boundaries at Surface and Episodes depth", async () => {
+    const trajectory = { id: "recurring", events: [
+      { id: "opening", sequence: 0, kind: "message" },
+      { id: "diagnose-1", sequence: 2, kind: "tool", alignment_key: "stage:diagnose" },
+      { id: "diagnose-2", sequence: 4, kind: "observation", alignment_key: "stage:diagnose" },
+      { id: "test", sequence: 6, kind: "tool", alignment_key: "stage:test" },
+      { id: "diagnose-3", sequence: 9, kind: "error", alignment_key: "stage:diagnose" },
+    ] };
+    render(<App initialTrajectory={trajectory} />);
+    fireEvent.keyDown(window, { key: "Enter" });
+    await screen.findByRole("main", { name: "Read trajectory" });
+    const boundaries = (selector: string) => [...document.querySelectorAll<HTMLElement>(selector)].map((element) => [element.dataset.episodeKey, element.dataset.episodeStart, element.dataset.episodeEnd]);
+    const surface = boundaries(".shape-strip:not(.compact) [data-episode-key]");
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(boundaries(".episode-button")).toEqual(surface);
+  });
+
+  it("restores the exact pre-descend axis on keyboard and strip ascent", async () => {
+    await openRead();
+    fireEvent.keyDown(window, { key: "+" });
+    fireEvent.keyDown(window, { key: "Enter" });
+    const lane = screen.getByRole("main", { name: "Read trajectory" });
+    const before = [lane.getAttribute("data-axis-start"), lane.getAttribute("data-axis-end")];
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect([lane.getAttribute("data-axis-start"), lane.getAttribute("data-axis-end")]).toEqual(before);
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.click(screen.getByRole("region", { name: "Compressed trajectory shape" }).querySelector("svg")!);
+    expect([lane.getAttribute("data-axis-start"), lane.getAttribute("data-axis-end")]).toEqual(before);
+  });
+
+  it("gives pointer and keyboard descent the same containing episode window", async () => {
+    const trajectory = { id: "layered", events: [
+      { id: "start", sequence: 0, kind: "message", alignment_key: "stage:setup" },
+      { id: "act", sequence: 20, kind: "tool", alignment_key: "stage:act" },
+      ...[29, 30, 31, 32].map((sequence) => ({ id: `verify-${sequence}`, sequence, kind: "observation", alignment_key: "stage:verify" })),
+      { id: "error", sequence: 34, kind: "error", alignment_key: "stage:verify" },
+      { id: "outcome", sequence: 50, kind: "reward", alignment_key: "stage:outcome" },
+    ] };
+    const descend = async (pointer: boolean) => {
+      const view = render(<App initialTrajectory={trajectory} />);
+      fireEvent.keyDown(window, { key: "Enter" });
+      const lane = await screen.findByRole("main", { name: "Read trajectory" });
+      fireEvent.keyDown(window, { key: "+" }); fireEvent.keyDown(window, { key: "+" }); fireEvent.keyDown(window, { key: "+" });
+      expect(Number(lane.getAttribute("data-axis-start"))).toBeGreaterThan(29);
+      fireEvent.keyDown(window, { key: "Enter" });
+      if (pointer) fireEvent.click(document.querySelector(".episode-button.selected")!);
+      else fireEvent.keyDown(window, { key: "Enter" });
+      const axis = [Number(lane.getAttribute("data-axis-start")), Number(lane.getAttribute("data-axis-end"))];
+      view.unmount(); window.history.replaceState({}, "", "/"); window.localStorage.clear();
+      return axis;
+    };
+    const pointer = await descend(true);
+    const keyboard = await descend(false);
+    expect(pointer).toEqual(keyboard);
+    expect(pointer[0]).toBeLessThanOrEqual(29);
+    expect(pointer[1]).toBeGreaterThanOrEqual(34);
+  });
+
   it("traverses episodes and expands event scope for cross-episode landmarks", async () => {
     await openRead();
     fireEvent.keyDown(window, { key: "Enter" });
@@ -82,13 +141,31 @@ describe("instrument viewer", () => {
   it("renders context lanes at Surface even when a deeper layer is stored", () => {
     const state = emptyWorkspace();
     const id = laneId("sample", sampleTrajectory.id);
-    state.lanes = [{ id, sourceId: "sample", trajectoryId: sampleTrajectory.id, band: "context", selected: 8, depth: 4, fidelity: 3, axis: { start: 1, end: 10 } }];
+    state.lanes = [{ id, sourceId: "sample", trajectoryId: sampleTrajectory.id, band: "context", selected: 8, depth: 4, fidelity: 3, axis: { start: 1, end: 10 }, descentStack: [] }];
     state.active = id;
     window.history.replaceState({ rlvizWorkspace: state }, "", `/?workspace=${encodeURIComponent(serializeWorkspace(state))}`);
     render(<App initialTrajectory={sampleTrajectory} />);
     const lane = screen.getByRole("main", { name: `Context lane ${sampleTrajectory.id}` });
     expect(lane).toHaveAttribute("data-depth", "1");
     expect(lane).toHaveAttribute("data-stored-depth", "4");
+  });
+
+  it("restores a context lane's stored depth when it is promoted to focus", async () => {
+    const state = emptyWorkspace();
+    const focusId = laneId("sample", sampleTrajectory.id);
+    const contextId = laneId("sample", "context-copy");
+    state.lanes = [
+      { id: focusId, sourceId: "sample", trajectoryId: sampleTrajectory.id, band: "focus", selected: 0, depth: 1, fidelity: 3, axis: { start: 0, end: 10 }, descentStack: [] },
+      { id: contextId, sourceId: "sample", trajectoryId: "context-copy", band: "context", selected: 8, depth: 3, fidelity: 3, axis: { start: 1, end: 10 }, descentStack: [{ depth: 2, axis: { start: 0, end: 10 } }] },
+    ];
+    state.active = contextId;
+    window.history.replaceState({ rlvizWorkspace: state }, "", `/?workspace=${encodeURIComponent(serializeWorkspace(state))}`);
+    render(<App initialTrajectory={sampleTrajectory} />);
+    const context = await screen.findByRole("main", { name: "Context lane context-copy" });
+    expect(context).toHaveAttribute("data-depth", "1");
+    fireEvent.keyDown(window, { key: "Enter", shiftKey: true });
+    expect(screen.getByRole("main", { name: "Read trajectory" })).toHaveAttribute("data-trajectory", "context-copy");
+    expect(screen.getByRole("main", { name: "Read trajectory" })).toHaveAttribute("data-depth", "3");
   });
 
   it("switches light and dark mode through the data-theme attribute", () => {
@@ -168,6 +245,22 @@ describe("instrument viewer", () => {
     fireEvent.keyDown(window, { key: "i", ctrlKey: true });
     expect(screen.getByRole("main", { name: "Read trajectory" })).toHaveAttribute("data-depth", "2");
     expect(document.querySelector(".workspace-breadcrumb")).toHaveTextContent("1 lane");
+  });
+
+  it("keeps the descent axis stack in jumplist snapshots", async () => {
+    await openRead();
+    fireEvent.keyDown(window, { key: "+" });
+    fireEvent.keyDown(window, { key: "Enter" });
+    const lane = screen.getByRole("main", { name: "Read trajectory" });
+    const before = [lane.getAttribute("data-axis-start"), lane.getAttribute("data-axis-end")];
+    fireEvent.keyDown(window, { key: "Enter" });
+    const descended = [lane.getAttribute("data-axis-start"), lane.getAttribute("data-axis-end")];
+    fireEvent.keyDown(window, { key: "o", ctrlKey: true });
+    expect([lane.getAttribute("data-axis-start"), lane.getAttribute("data-axis-end")]).toEqual(before);
+    fireEvent.keyDown(window, { key: "i", ctrlKey: true });
+    expect([lane.getAttribute("data-axis-start"), lane.getAttribute("data-axis-end")]).toEqual(descended);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect([lane.getAttribute("data-axis-start"), lane.getAttribute("data-axis-end")]).toEqual(before);
   });
 
   it("pans a zoomed axis when a landmark jump leaves the window", async () => {
