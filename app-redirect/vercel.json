@@ -1,6 +1,11 @@
 {
   "redirects": [
     {
+      "source": "/",
+      "destination": "https://rlviz.dev/",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "destination": "https://rlviz.dev/:path*",
       "permanent": true
