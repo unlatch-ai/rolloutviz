@@ -77,10 +77,22 @@ async function observe(page: Page, observable: Observable, boxes: Map<string, Aw
   if (!observable.attribute && observable.contains !== undefined) await expect(locator.first()).toContainText(observable.contains);
   if (observable.boxEquals) expect(await locator.first().boundingBox()).toEqual(boxes.get(observable.boxEquals));
   if (observable.boxNotEquals) expect(await locator.first().boundingBox()).not.toEqual(boxes.get(observable.boxNotEquals));
+  if (observable.boxFills) {
+    const actual = await locator.first().boundingBox(), expected = boxes.get(observable.boxFills);
+    expect(actual).not.toBeNull(); expect(expected).not.toBeNull();
+    for (const key of ["x", "y", "width", "height"] as const) expect(Math.abs(actual![key] - expected![key])).toBeLessThanOrEqual(1);
+  }
   if (observable.attribute && observable.attributeEqualsCapture) expect(await locator.first().getAttribute(observable.attribute)).toBe(attributes.get(observable.attributeEqualsCapture));
   if (observable.attribute && observable.attributeNotEqualsCapture) expect(await locator.first().getAttribute(observable.attribute)).not.toBe(attributes.get(observable.attributeNotEqualsCapture));
   if (observable.attribute && observable.attributeNumberLte !== undefined) expect(Number(await locator.first().getAttribute(observable.attribute))).toBeLessThanOrEqual(observable.attributeNumberLte);
   if (observable.attribute && observable.attributeNumberGte !== undefined) expect(Number(await locator.first().getAttribute(observable.attribute))).toBeGreaterThanOrEqual(observable.attributeNumberGte);
+  if (observable.relativeXGte !== undefined || observable.relativeXLte !== undefined) {
+    const mark = await locator.first().boundingBox(), strip = await locator.first().locator("..").boundingBox();
+    expect(mark).not.toBeNull(); expect(strip).not.toBeNull();
+    const relativeX = (mark!.x + mark!.width / 2 - strip!.x) / strip!.width;
+    if (observable.relativeXGte !== undefined) expect(relativeX).toBeGreaterThanOrEqual(observable.relativeXGte);
+    if (observable.relativeXLte !== undefined) expect(relativeX).toBeLessThanOrEqual(observable.relativeXLte);
+  }
 }
 
 for (const flow of flows.filter((item) => item.surfaces.includes("webapp"))) {

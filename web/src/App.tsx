@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { daemonProvider, ViewerProviderContext } from "./provider";
 import type { ViewerProvider } from "./provider";
-import { bindingLabel, commandDefinition, commandIds, commands, dispatchCommand, useCommands, useKeymapRevision } from "./commands";
+import { commandDefinition, commandIds, commands, dispatchCommand, firstBindingLabel, useCommands, useKeymapRevision } from "./commands";
 import type { CommandId } from "./commands";
 import { axisX, episodeIndexForEvent, episodesFor, episodeWindow, firstAnomaly, glyphForKind, layoutStrip, panWindowToInclude, stripX, verdictGlyph, zoomWindow } from "./instrument";
 import type { Episode, StripMark } from "./instrument";
@@ -285,7 +285,7 @@ const KEYBAR_LANE: CommandId[] = [commandIds.trajectory.next, commandIds.traject
 function KeyBar({ module, selection }: { module: "collection" | "lane"; selection?: string }) {
   const ids = module === "collection" ? KEYBAR_COLLECTION : KEYBAR_LANE;
   return <footer className="keybar" aria-label="Active module keys">
-    {ids.map((id) => { const command = commandDefinition(id); return <button key={id} className="keybar-chip" tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onClick={() => dispatchCommand(id)}><kbd>{bindingLabel(id)}</kbd><span>{command.label}</span></button>; })}
+    {ids.map((id) => { const command = commandDefinition(id); return <button key={id} className="keybar-chip" tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onClick={() => dispatchCommand(id)}><kbd>{firstBindingLabel(id)}</kbd><span>{command.label}</span></button>; })}
     {selection && <span className="selection-address">{selection}</span>}
   </footer>;
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { attentionScore, axisX, episodesFor, episodeWindow, layoutStrip, stageChanged, stagesFor, summarizeShape } from "./instrument";
 import type { BrowseTrajectory, ComparisonSide, TrajectoryEvent } from "./types";
+import galleryShapeRaw from "../../fixtures/shape/coding-agent-bugfix.json?raw";
+import galleryRaw from "../../examples/gallery/coding-agent-bugfix.ndjson?raw";
 
 const row = (id: string, values: { errors?: number; pass?: boolean; reward?: number }): BrowseTrajectory => ({
   source_id: "source",
@@ -170,5 +172,11 @@ describe("summarizeShape (honest collection strips)", () => {
 
   it("handles empty input", () => {
     expect(summarizeShape([], 8).slots).toHaveLength(8);
+  });
+
+  it("matches the shared Go gallery snapshot", () => {
+    const events = galleryRaw.trim().split("\n").map((line) => JSON.parse(line) as TrajectoryEvent & { record_type: string; trajectory_id: string })
+      .filter((record) => record.record_type === "event" && record.trajectory_id === "coding-bugfix-rollout-01");
+    expect(summarizeShape(events)).toEqual(JSON.parse(galleryShapeRaw));
   });
 });

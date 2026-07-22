@@ -2,7 +2,7 @@ import { fireEvent, render } from "@testing-library/react";
 import { createElement, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import interactionSpec from "../../docs/interaction-spec.md?raw";
-import { applyPresentationKeymap, bindingsFor, commandIds, commands, detectKeymapConflicts, eventBinding, keymapStorageKey, loadKeymapOverrides, matchesBinding, normalizeBinding, presentationKeymapOverrides, resetKeymapOverrides, saveKeymapOverrides, setCommandBindings } from "./commands";
+import { applyPresentationKeymap, bindingsFor, commandIds, commands, detectKeymapConflicts, eventBinding, firstBindingLabel, keymapStorageKey, loadKeymapOverrides, matchesBinding, normalizeBinding, presentationKeymapOverrides, resetKeymapOverrides, saveKeymapOverrides, setCommandBindings } from "./commands";
 import { useCommands } from "./commands";
 
 describe("command registry", () => {
@@ -64,6 +64,11 @@ describe("command registry", () => {
     expect(loadKeymapOverrides(storage)[commandIds.trajectory.next]).toEqual(["n"]);
     resetKeymapOverrides(storage);
     expect(loadKeymapOverrides(storage)).toEqual({});
+  });
+
+  it("shows only the first binding in compact keybar labels", () => {
+    expect(firstBindingLabel(commandIds.trajectory.next, { [commandIds.trajectory.next]: ["j", "ArrowDown"] })).toBe("j");
+    expect(firstBindingLabel(commandIds.trajectory.dismiss, { [commandIds.trajectory.dismiss]: ["Escape", "q"] })).toBe("Esc");
   });
 
   it("reports conflicts introduced by overrides only within the active scope", () => {

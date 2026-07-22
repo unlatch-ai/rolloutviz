@@ -9,10 +9,13 @@ export type Observable = {
   count?: number;
   boxEquals?: string;
   boxNotEquals?: string;
+  boxFills?: string;
   attributeEqualsCapture?: string;
   attributeNotEqualsCapture?: string;
   attributeNumberLte?: number;
   attributeNumberGte?: number;
+  relativeXGte?: number;
+  relativeXLte?: number;
 };
 
 export type FlowAction =
@@ -38,7 +41,7 @@ const depth = (level: 1 | 2 | 3 | 4): Observable[] => [attr("read", "data-depth"
 export const flows: Flow[] = [
   {
     id: "a", name: "source-order-sweep", keyboardOnly: true, surfaces: ["daemon", "webapp"], steps: [
-      { action: { kind: "key", value: "j" }, expect: [selectedRow("partial"), { target: "browse", contains: "6 trajectories" }] },
+      { action: { kind: "key", value: "j" }, expect: [selectedRow("partial"), { target: "browse", contains: "7 trajectories" }] },
       { action: { kind: "key", value: "j" }, expect: [selectedRow("fourth")] },
       { action: { kind: "filter", value: "reference" }, expect: [selectedRow("reference"), attr("browse", "data-filter", "reference")] },
       { action: { kind: "filter", value: "" }, expect: [selectedRow("reference"), attr("browse", "data-filter", "")] },
@@ -146,7 +149,8 @@ export const flows: Flow[] = [
   },
   {
     id: "g", name: "anti-jitter-depth-zoom", keyboardOnly: true, surfaces: ["daemon", "webapp"], steps: [
-      { action: { kind: "key", value: "Enter" }, expect: [{ target: "focus-lane", count: 1 }] },
+      { action: { kind: "capture-box", target: ".workspace-stage", key: "single-lane-stage" }, expect: [{ target: "stage" }] },
+      { action: { kind: "key", value: "Enter" }, expect: [{ target: "focus-lane", count: 1 }, { target: "focus-lane", selector: ".lane-track.active-zone", boxFills: "single-lane-stage" }] },
       { action: { kind: "capture-box", target: ".lane-track.active-zone", key: "lane-track" }, expect: [...depth(1)] },
       { action: { kind: "key", value: "Enter" }, expect: [...depth(2), { target: "focus-lane", selector: ".lane-track.active-zone", boxEquals: "lane-track" }] },
       { action: { kind: "key", value: "+" }, expect: [{ target: "focus-lane", selector: ".lane-track.active-zone", boxEquals: "lane-track" }] },
@@ -327,6 +331,13 @@ export const flows: Flow[] = [
       { action: { kind: "click", target: ".keybar-chip:first-child" }, expect: [selectedEvent("Final reward")] },
       { action: { kind: "key", value: "k" }, expect: [selectedEvent("Policy error")] },
       { action: { kind: "key", value: "j" }, expect: [selectedEvent("Final reward")] },
+    ],
+  },
+  {
+    id: "t", name: "daemon-gallery-shape-keeps-errors-mid-strip", keyboardOnly: true, surfaces: ["daemon"], steps: [
+      { action: { kind: "filter", value: "coding-bugfix" }, expect: [selectedRow("coding-bugfix-rollout-01")] },
+      { action: { kind: "key", value: "Escape" }, expect: [selectedRow("coding-bugfix-rollout-01")] },
+      { action: { kind: "key", value: "[" }, expect: [{ target: "rail", selector: ".browse-row .strip-landmark.error", relativeXGte: 0.4, relativeXLte: 0.6 }] },
     ],
   },
 ];

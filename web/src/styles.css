@@ -181,6 +181,8 @@ kbd { border: 1px solid var(--hairline); border-bottom-width: 2px; border-radius
 .workspace-rail .cat-glyphs { max-width: 100%; }.workspace-rail .numeric { display: inline; }.workspace-rail .row-state { min-height: 13px; }
 .rail-actions { position: absolute; left: 8px; bottom: calc(var(--console-height) + 18px); z-index: 3; display: none; }
 .workspace-stage { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, var(--focus-height)) 5px minmax(0, calc(100% - var(--focus-height) - 5px)); overflow: hidden; background: var(--page); }
+.workspace-stage:has(> .focus-band > .focus-slot:only-child):not(:has(> .context-band)) { grid-template-rows: minmax(0, 1fr) 0 0; }
+.workspace-stage:has(> .focus-band > .focus-slot:only-child):not(:has(> .context-band)) > [data-seam="focusContext"] { display: none; }
 .focus-band { min-height: 0; min-width: 0; display: flex; overflow: hidden; }
 .focus-band.direction-rows { flex-direction: column; }.focus-band.direction-columns { flex-direction: row; }
 .focus-slot { min-height: 0; min-width: 0; flex-grow: 0; flex-shrink: 1; overflow: hidden; }

@@ -9,6 +9,7 @@ import (
 
 	rolloutindex "github.com/TheSnakeFang/rlviz/internal/index"
 	"github.com/TheSnakeFang/rlviz/internal/model"
+	"github.com/TheSnakeFang/rlviz/internal/shape"
 )
 
 const maxBrowseRows = 1000
@@ -16,6 +17,7 @@ const maxBrowseRows = 1000
 type indexedBrowseReader interface {
 	Sources(context.Context) ([]rolloutindex.SourceInfo, error)
 	Groups(context.Context, string) ([]rolloutindex.IndexedRecord[*model.Group], error)
+	TrajectoryShapeEvents(context.Context, string, []string) (map[string][]shape.Event, error)
 }
 
 type browseRow struct {
@@ -26,6 +28,7 @@ type browseRow struct {
 	GroupName  string            `json:"group_name,omitempty"`
 	Trajectory *model.Trajectory `json:"trajectory"`
 	Metrics    browseMetrics     `json:"metrics"`
+	Shape      shape.Summary     `json:"shape"`
 }
 
 type browseMetrics struct {
@@ -91,11 +94,25 @@ func (api *indexedAPI) browse(response http.ResponseWriter, request *http.Reques
 				writeJSONError(response, http.StatusRequestEntityTooLarge, "browse_too_large", errors.New("browse collection exceeds 1000 trajectories"))
 				return
 			}
+			trajectoryIDs := make([]string, len(page.Items))
+			for index, summary := range page.Items {
+				trajectoryIDs[index] = summary.Trajectory.Value.ID
+			}
+			shapeEvents := map[string][]shape.Event{}
+			if len(trajectoryIDs) > 0 {
+				shapeEvents, err = reader.TrajectoryShapeEvents(request.Context(), source.ID, trajectoryIDs)
+				if err != nil {
+					api.writeReadError(response, "browse_failed", err)
+					return
+				}
+			}
 			for _, summary := range page.Items {
+				trajectoryID := summary.Trajectory.Value.ID
 				rows = append(rows, browseRow{
 					SourceID: source.ID, SourceName: filepath.Base(source.Path),
 					RunName: summary.RunName, CaseName: summary.CaseName,
 					GroupName: summary.GroupName, Trajectory: summary.Trajectory.Value, Metrics: browseSummary(summary),
+					Shape: shape.Summarize(shapeEvents[trajectoryID], shape.DefaultSlotCount),
 				})
 			}
 		}

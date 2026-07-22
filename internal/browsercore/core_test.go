@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/TheSnakeFang/rlviz/internal/model"
+	"github.com/TheSnakeFang/rlviz/internal/shape"
 )
 
 func TestParseBuiltInBrowserFormats(t *testing.T) {
@@ -90,6 +91,9 @@ func TestParseCanonicalPreservesTrajectoryRecordOrder(t *testing.T) {
 	rows := collection.Browse["trajectories"].([]BrowseRow)
 	if rows[0].Trajectory.ID != "z-first" || rows[1].Trajectory.ID != "a-second" {
 		t.Fatalf("browse order = %q, %q", rows[0].Trajectory.ID, rows[1].Trajectory.ID)
+	}
+	if rows[0].Shape.Events != 1 || len(rows[0].Shape.Slots) != shape.DefaultSlotCount {
+		t.Fatalf("browse shape = %#v", rows[0].Shape)
 	}
 }
 

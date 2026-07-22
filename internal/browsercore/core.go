@@ -21,6 +21,7 @@ import (
 	"github.com/TheSnakeFang/rlviz/internal/alignment"
 	"github.com/TheSnakeFang/rlviz/internal/analyzers"
 	"github.com/TheSnakeFang/rlviz/internal/model"
+	"github.com/TheSnakeFang/rlviz/internal/shape"
 )
 
 const MaxRecommendedBytes = 32 << 20
@@ -49,6 +50,7 @@ type BrowseRow struct {
 	GroupName  string           `json:"group_name,omitempty"`
 	Trajectory model.Trajectory `json:"trajectory"`
 	Metrics    map[string]any   `json:"metrics"`
+	Shape      shape.Summary    `json:"shape"`
 }
 
 type TrajectoryData struct {
@@ -172,7 +174,11 @@ func ParseCanonical(canonical []byte, name, format string, sourceSize int) (Coll
 			run = runs[currentCase.RunID]
 		}
 		metrics := trajectoryMetrics(trajectory, events[id], signals[id])
-		rows = append(rows, BrowseRow{SourceID: source.ID, SourceName: source.Name, RunName: nameOfRun(run), CaseName: nameOfCase(currentCase), GroupName: nameOfGroup(group), Trajectory: trajectory, Metrics: metrics})
+		shapeEvents := make([]shape.Event, len(events[id]))
+		for index, event := range events[id] {
+			shapeEvents[index] = shape.Event{Sequence: event.Sequence, Kind: event.Kind, AlignmentKey: event.AlignmentKey, HasContext: event.Context != nil}
+		}
+		rows = append(rows, BrowseRow{SourceID: source.ID, SourceName: source.Name, RunName: nameOfRun(run), CaseName: nameOfCase(currentCase), GroupName: nameOfGroup(group), Trajectory: trajectory, Metrics: metrics, Shape: shape.Summarize(shapeEvents, shape.DefaultSlotCount)})
 		page := map[string]any{"count": len(events[id]), "total": len(events[id]), "limit": len(events[id]), "has_more": false}
 		data[id] = TrajectoryData{Trajectory: trajectory, Events: nonnil(events[id]), Signals: nonnil(signals[id]), Artifacts: nonnil(artifacts[id]), Run: run, Case: currentCase, Group: group, Source: source, Page: page}
 	}

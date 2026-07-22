@@ -272,7 +272,7 @@ export function summarizeShape(events: TrajectoryEvent[], slotCount = 48): Shape
   const span = Math.max(1e-9, last - first);
   const landmarkPriority: Record<LandmarkKind, number> = { error: 3, context: 2, evidence: 1 };
   events.forEach((event) => {
-    const slot = slots[Math.min(slotCount - 1, Math.floor(((event.sequence - first) / span) * slotCount))];
+    const slot = slots[Math.max(0, Math.min(slotCount - 1, Math.floor(((event.sequence - first) / span) * slotCount)))];
     slot.count += 1;
     const kind = stripMarkKind(event);
     if (kind === "tool") slot.tools += 1;

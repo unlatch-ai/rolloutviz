@@ -1,8 +1,14 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { flows, type FlowAction, type Observable } from "./flows";
+import { summarizeShape } from "../src/instrument";
+
+const galleryPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../examples/gallery/coding-agent-bugfix.ndjson");
+const codingEvents = readFileSync(galleryPath, "utf8").trim().split("\n").map((line) => JSON.parse(line))
+  .filter((record) => record.record_type === "event" && record.trajectory_id === "coding-bugfix-rollout-01");
 
 const rows = [
   { id: "candidate", pass: false, reward: -0.8, errors: 1 },
@@ -13,6 +19,7 @@ const rows = [
   // established a-p flows retain their deterministic row order.
   { id: "layered", pass: true, reward: 1, errors: 0 },
   { id: "long", pass: true, reward: 1, errors: 0 },
+  { id: "coding-bugfix-rollout-01", pass: true, reward: 0.96, errors: 17 },
 ];
 
 const events = (id: string) => [
@@ -40,12 +47,15 @@ const longEvents = Array.from({ length: 250 }, (_, sequence) => ({ id: `long-${s
 
 const browse = {
   sources: [{ id: "source-1", path: "/tmp/demo.ndjson", index_state: "complete" }], count: rows.length,
-  trajectories: rows.map((row) => ({ source_id: "source-1", source_name: "demo.ndjson", case_name: row.id, group_name: "demo group", trajectory: { id: row.id, group_id: "group", status: row.pass ? "completed" : "failed" }, metrics: { trajectory: { id: row.id, group_id: "group" }, event_count: row.id === "long" ? 250 : row.id === "layered" ? 10 : 6, error_count: row.errors, pass: row.pass, reward: row.reward } })),
+  trajectories: rows.map((row) => {
+    const shapeEvents = row.id === "coding-bugfix-rollout-01" ? codingEvents : row.id === "long" ? longEvents : row.id === "layered" ? layeredEvents : events(row.id);
+    return { source_id: "source-1", source_name: "demo.ndjson", case_name: row.id, group_name: "demo group", trajectory: { id: row.id, group_id: "group", status: row.pass ? "completed" : "failed" }, metrics: { trajectory: { id: row.id, group_id: "group" }, event_count: shapeEvents.length, error_count: row.errors, pass: row.pass, reward: row.reward }, shape: summarizeShape(shapeEvents) };
+  }),
 };
 
 const trajectoryResponse = (id: string) => {
   const row = rows.find((item) => item.id === id)!;
-  const allEvents = id === "layered" ? layeredEvents : id === "long" ? longEvents : events(id);
+  const allEvents = id === "coding-bugfix-rollout-01" ? codingEvents : id === "layered" ? layeredEvents : id === "long" ? longEvents : events(id);
   const loadedEvents = id === "long" ? allEvents.slice(0, 200) : allEvents;
   return { trajectory: { id, group_id: "group", status: row.pass ? "completed" : "failed", termination: row.pass ? "complete" : "grader_failed" }, events: loadedEvents, signals: [{ id: `${id}-pass`, trajectory_id: id, event_id: `${id}-grader`, name: "pass", value: row.pass }, { id: `${id}-reward-signal`, trajectory_id: id, event_id: `${id}-reward`, name: "reward", value: row.reward }], page: { count: loadedEvents.length, total: allEvents.length, limit: 200, next_sequence: id === "long" ? 199 : undefined, has_more: id === "long" } };
 };
@@ -130,10 +140,22 @@ async function observe(page: Page, observable: Observable, boxes: Map<string, Aw
   if (!observable.attribute && observable.contains !== undefined) await expect(locator.first()).toContainText(observable.contains);
   if (observable.boxEquals) expect(await locator.first().boundingBox()).toEqual(boxes.get(observable.boxEquals));
   if (observable.boxNotEquals) expect(await locator.first().boundingBox()).not.toEqual(boxes.get(observable.boxNotEquals));
+  if (observable.boxFills) {
+    const actual = await locator.first().boundingBox(), expected = boxes.get(observable.boxFills);
+    expect(actual).not.toBeNull(); expect(expected).not.toBeNull();
+    for (const key of ["x", "y", "width", "height"] as const) expect(Math.abs(actual![key] - expected![key])).toBeLessThanOrEqual(1);
+  }
   if (observable.attribute && observable.attributeEqualsCapture) expect(await locator.first().getAttribute(observable.attribute)).toBe(attributes.get(observable.attributeEqualsCapture));
   if (observable.attribute && observable.attributeNotEqualsCapture) expect(await locator.first().getAttribute(observable.attribute)).not.toBe(attributes.get(observable.attributeNotEqualsCapture));
   if (observable.attribute && observable.attributeNumberLte !== undefined) expect(Number(await locator.first().getAttribute(observable.attribute))).toBeLessThanOrEqual(observable.attributeNumberLte);
   if (observable.attribute && observable.attributeNumberGte !== undefined) expect(Number(await locator.first().getAttribute(observable.attribute))).toBeGreaterThanOrEqual(observable.attributeNumberGte);
+  if (observable.relativeXGte !== undefined || observable.relativeXLte !== undefined) {
+    const mark = await locator.first().boundingBox(), strip = await locator.first().locator("..").boundingBox();
+    expect(mark).not.toBeNull(); expect(strip).not.toBeNull();
+    const relativeX = (mark!.x + mark!.width / 2 - strip!.x) / strip!.width;
+    if (observable.relativeXGte !== undefined) expect(relativeX).toBeGreaterThanOrEqual(observable.relativeXGte);
+    if (observable.relativeXLte !== undefined) expect(relativeX).toBeLessThanOrEqual(observable.relativeXLte);
+  }
 }
 
 async function invariants(page: Page) {

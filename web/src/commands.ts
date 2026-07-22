@@ -305,6 +305,11 @@ export function bindingLabel(id: CommandId, overrides = loadKeymapOverrides()): 
   return bindingsFor(id, overrides).map((binding) => binding === "Space" ? "Space" : binding === "Escape" ? "Esc" : binding).join(" / ");
 }
 
+export function firstBindingLabel(id: CommandId, overrides = loadKeymapOverrides()): string {
+  const binding = bindingsFor(id, overrides)[0] ?? "";
+  return binding === "Space" ? "Space" : binding === "Escape" ? "Esc" : binding;
+}
+
 /** Re-render a command surface when this tab or another tab edits the keymap. */
 export function useKeymapRevision(): number {
   const [revision, setRevision] = useState(0);
