@@ -26,27 +26,23 @@ describe("instrument viewer", () => {
     expect(screen.getByRole("option", { selected: true })).toHaveTextContent(chosen.textContent ?? "");
   });
 
-  it("renders every global fidelity ladder family", () => {
+  it("renders the three-level fidelity ladder with truthful strips", () => {
     render(<App initialTrajectory={sampleTrajectory} />);
+    // default: glyphs — the sample provider carries no shape summary, so the
+    // strip must degrade to length + counts, never synthetic texture.
     expect(screen.getByText("glyphs", { selector: ".fidelity-readout b" })).toBeInTheDocument();
-		expect(document.querySelector(".cat-glyphs")).toBeInTheDocument();
+    expect(document.querySelector(".cat-texture")).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: "]" });
-		expect(screen.getByText("previews", { selector: ".fidelity-readout b" })).toBeInTheDocument();
-		expect(document.querySelector(".cat-glyphs small")).toHaveTextContent(/events/);
-		fireEvent.keyDown(window, { key: "]" });
-		expect(screen.getByText("full", { selector: ".fidelity-readout b" })).toBeInTheDocument();
-		fireEvent.keyDown(window, { key: "[" });
-		fireEvent.keyDown(window, { key: "[" });
-		fireEvent.keyDown(window, { key: "[" });
-		expect(screen.getByText("texture", { selector: ".fidelity-readout b" })).toBeInTheDocument();
-		expect(document.querySelector(".cat-texture")).toBeInTheDocument();
-		fireEvent.keyDown(window, { key: "[" });
-		expect(screen.getByText("marks", { selector: ".fidelity-readout b" })).toBeInTheDocument();
-		fireEvent.keyDown(window, { key: "[" });
-		expect(screen.getByText("hairline", { selector: ".fidelity-readout b" })).toBeInTheDocument();
-		expect(document.querySelector(".cat-line")).toBeInTheDocument();
-		expect(screen.queryByRole("button", { name: "table" })).not.toBeInTheDocument();
-		expect(screen.queryByRole("button", { name: "caterpillars" })).not.toBeInTheDocument();
+    expect(screen.getByText("detail", { selector: ".fidelity-readout b" })).toBeInTheDocument();
+    expect(document.querySelector("[data-columns='true']")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "]" });
+    expect(screen.getByText("detail", { selector: ".fidelity-readout b" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "[" });
+    fireEvent.keyDown(window, { key: "[" });
+    expect(screen.getByText("hairline", { selector: ".fidelity-readout b" })).toBeInTheDocument();
+    expect(document.querySelector(".cat-line")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "table" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "caterpillars" })).not.toBeInTheDocument();
   });
 
   it("keeps pointer and keyboard layer transitions anchored to the selected moment", async () => {
@@ -207,14 +203,14 @@ describe("instrument viewer", () => {
 	fireEvent.keyDown(window, { key: "Enter" });
 	fireEvent.keyDown(window, { key: "Enter" });
 	fireEvent.keyDown(window, { key: "Enter" });
-	expect(screen.getByText(/depth 4\/4/)).toBeInTheDocument();
+	expect(screen.getByText("raw")).toBeInTheDocument();
 	expect(screen.getByRole("region", { name: "Event source" })).toBeInTheDocument();
 	fireEvent.keyDown(window, { key: "Escape" });
-	expect(screen.getByText(/depth 3\/4/)).toBeInTheDocument();
+	expect(screen.getByText("events")).toBeInTheDocument();
 	fireEvent.keyDown(window, { key: "Escape" });
-	expect(screen.getByText(/depth 2\/4/)).toBeInTheDocument();
+	expect(screen.getByText("episodes")).toBeInTheDocument();
 	fireEvent.keyDown(window, { key: "Escape" });
-	expect(screen.getByText(/depth 1\/4/)).toBeInTheDocument();
+	expect(screen.getByText("overview")).toBeInTheDocument();
 	fireEvent.keyDown(window, { key: "Escape" });
 	expect(screen.getByRole("main", { name: "Browse trajectories" })).toBeInTheDocument();
   });

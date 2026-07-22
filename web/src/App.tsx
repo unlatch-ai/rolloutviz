@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { daemonProvider, ViewerProviderContext } from "./provider";
 import type { ViewerProvider } from "./provider";
-import { commandIds, commands, useCommands, useKeymapRevision } from "./commands";
-import { attentionScore, axisX, episodeIndexForEvent, episodesFor, episodeWindow, firstAnomaly, glyphForKind, panWindowToInclude, verdictGlyph, zoomWindow } from "./instrument";
-import type { Episode } from "./instrument";
+import { bindingLabel, commandDefinition, commandIds, commands, dispatchCommand, useCommands, useKeymapRevision } from "./commands";
+import type { CommandId } from "./commands";
+import { axisX, episodeIndexForEvent, episodesFor, episodeWindow, firstAnomaly, glyphForKind, layoutStrip, panWindowToInclude, stripX, verdictGlyph, zoomWindow } from "./instrument";
+import type { Episode, StripMark } from "./instrument";
 import type { AnalysisResponse, BrowseResponse, BrowseTrajectory, Trajectory, TrajectoryEvent } from "./types";
 import { preview, title } from "./format";
 import { sampleTrajectory } from "./sample";
@@ -14,7 +15,7 @@ import { defaultSeams, effectiveDepth, emptyWorkspace, laneId, legacyWorkspace, 
 import type { SeamRatios, WorkspaceLane, WorkspaceState } from "./workspace";
 import { VirtualList } from "./VirtualList";
 
-const fidelityNames = ["hairline", "marks", "texture", "glyphs", "previews", "full"];
+const fidelityNames = ["hairline", "glyphs", "detail"];
 const seamStorageKey = `${workspaceStorageKey}.seams`;
 type SeamName = keyof SeamRatios;
 type LaneData = { trajectory: Trajectory; analysis: AnalysisResponse | null; presentation?: PresentationConfig };
@@ -62,87 +63,148 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
   </div>;
 }
 
-function Caterpillar({ row, fidelity }: { row: BrowseTrajectory; fidelity: number }) {
+function CollectionStrip({ row, fidelity }: { row: BrowseTrajectory; fidelity: number }) {
   const count = Math.max(1, Number(metric(row, "event_count") ?? 1));
   const errors = Number(metric(row, "error_count") ?? 0);
   const width = Math.min(100, 18 + Math.log2(count + 1) * 13);
-  if (fidelity === 0) return <span className="cat-line" style={{ width: `${width}%` }}>{errors > 0 && <i className="abnormal" />}</span>;
-  if (fidelity === 1) return <span className="cat-marks" style={{ width: `${width}%` }}>{Array.from({ length: Math.min(24, count) }, (_, index) => <i className={errors && index >= Math.min(23, count - 1) ? "abnormal" : ""} key={index} />)}</span>;
-  if (fidelity === 2) return <span className="cat-texture" style={{ width: `${width}%` }}>{Array.from({ length: Math.min(32, count) }, (_, index) => <i className={`${index % 3 === 0 ? "strong" : ""} ${errors && index >= Math.min(31, count - 1) ? "abnormal" : ""}`} key={index} />)}</span>;
-  const glyphs = `${"▸‒·▮".repeat(Math.max(1, Math.ceil(Math.min(count, 40) / 4))).slice(0, Math.min(count, 40))}${errors ? "✕" : ""}`;
-  return <span className="cat-glyphs" style={{ width: `${width}%` }}>{glyphs}{fidelity >= 4 && <small>{count} events{errors ? ` · ${errors} errors` : ""}</small>}</span>;
+  const shape = row.shape;
+  if (!shape) {
+    // No shape summary from this provider yet: render only what is true —
+    // length and counts. Never synthesize texture or positions.
+    return <span className="cat-line" style={{ width: `${width}%` }}>{errors > 0 && <em className="strip-badge" title={`${errors} errors`}>{errors}✕</em>}</span>;
+  }
+  if (fidelity === 0) {
+    return <span className="cat-line" style={{ width: `${width}%` }}>
+      {shape.slots.map((slot, index) => slot.landmark ? <i key={index} className={`strip-landmark ${slot.landmark}`} style={{ left: `${((index + 0.5) / shape.slots.length) * 100}%` }} /> : null)}
+    </span>;
+  }
+  const glyphSlots = shape.slots.map((slot, index) => {
+    if (slot.landmark === "error") return <b key={index} className="g-error">✕</b>;
+    if (slot.landmark === "context") return <b key={index} className="g-context">◇</b>;
+    if (slot.landmark === "evidence") return <b key={index} className="g-evidence">◆</b>;
+    if (!slot.count) return <span key={index} className="g-gap"> </span>;
+    return <span key={index}>{slot.tools * 2 > slot.count ? "▮" : "·"}</span>;
+  });
+  return <span className="cat-glyphs" style={{ width: `${width}%` }}>{glyphSlots}{fidelity >= 2 && <small>{shape.events} events{errors ? ` · ${errors} errors` : ""}</small>}</span>;
 }
 
-function Rail({ root, rows, workspace, fidelity, tags, onActivate, onSelect, onOpen, onAdd, onQuery, onTag }: {
-  root: RefObject<HTMLElement | null>; rows: BrowseTrajectory[]; workspace: WorkspaceState; fidelity: number; tags: Map<string, number>;
-  onActivate: () => void; onSelect: (index: number) => void; onOpen: () => void; onAdd: () => void; onQuery: (query: string) => void; onTag: (tag: number) => void;
+function Rail({ root, rows, workspace, fidelity, onActivate, onSelect, onOpen, onAdd, onQuery }: {
+  root: RefObject<HTMLElement | null>; rows: BrowseTrajectory[]; workspace: WorkspaceState; fidelity: number;
+  onActivate: () => void; onSelect: (index: number) => void; onOpen: () => void; onAdd: () => void; onQuery: (query: string) => void;
 }) {
   const selected = Math.min(workspace.railSelected, Math.max(0, rows.length - 1));
   return <main ref={root} tabIndex={0} className={`workspace-rail ${workspace.active === "rail" ? "active-zone" : ""}`} aria-label="Browse trajectories" data-filter={workspace.railQuery} data-fidelity={fidelityNames[fidelity]} onFocus={onActivate}>
-    <header><div><span className="eyebrow">Rail</span><h1>Known trajectories</h1><p>{rows.filter((row) => !tags.has(row.trajectory.id)).length} unresolved</p></div></header>
+    <header><div><h1>Trajectories</h1><p>{rows.length === 1 ? "1 trajectory" : `${rows.length} trajectories`}</p></div></header>
     <div className="rail-controls"><label>Filter <input id="browse-filter" value={workspace.railQuery} onChange={(event) => onQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); root.current?.focus(); } }} /></label></div>
     <div className="fidelity-readout">fidelity <b>{fidelityNames[fidelity]}</b> · [ ]</div>
     <section className={`browse-list rail-fidelity-${fidelity}`} role="listbox" aria-label="Trajectory collection" data-fidelity-level={`L${fidelity}`}>
-      {rows.map((row, index) => <button key={rowKey(row)} role="option" aria-selected={index === selected} data-fidelity-level={`L${fidelity}`} data-columns={fidelity >= 4 ? "true" : "false"} className={`browse-row ${index === selected ? "selected" : ""}`} onClick={() => onSelect(index)} onDoubleClick={onOpen}>
-        {fidelity >= 1 && <span className="verdict">{verdictGlyph(row)}</span>}<span className="identity"><b>{row.trajectory.id}</b>{fidelity >= 4 && <small>{row.case_name ?? row.group_name ?? row.source_name}</small>}</span><Caterpillar row={row} fidelity={fidelity} />
+      {rows.map((row, index) => <button key={rowKey(row)} role="option" aria-selected={index === selected} data-fidelity-level={`L${fidelity}`} data-columns={fidelity >= 2 ? "true" : "false"} className={`browse-row ${index === selected ? "selected" : ""}`} onClick={() => onSelect(index)} onDoubleClick={onOpen}>
+        {fidelity >= 1 && <span className="verdict">{verdictGlyph(row)}</span>}<span className="identity"><b>{row.trajectory.id}</b>{fidelity >= 2 && <small>{row.case_name ?? row.group_name ?? row.source_name}</small>}</span><CollectionStrip row={row} fidelity={fidelity} />
         {fidelity >= 4 && <><span className="numeric events-column">{String(metric(row, "event_count") ?? "—")} ev</span><span className="numeric reward-column">{metric(row, "reward") === undefined ? "" : `r ${String(metric(row, "reward"))}`}</span></>}
-        {fidelity >= 5 && <span className="row-state">{tags.has(row.trajectory.id) ? `tag ${tags.get(row.trajectory.id)}` : `${row.source_name}${row.group_name ? ` · ${row.group_name}` : ""}`}</span>}
+        {fidelity >= 2 && <span className="row-state">{row.source_name}{row.group_name ? ` · ${row.group_name}` : ""}</span>}
       </button>)}
       {!rows.length && <p className="empty-state">No trajectories match this filter.</p>}
     </section>
-    <footer className="zone-keys"><span><kbd>Enter</kbd> open</span><span><kbd>A</kbd> add</span><span><kbd>Tab</kbd> cycle</span></footer>
-    <span className="rail-actions"><button onClick={onAdd}>add lane</button>{[1, 2, 3, 4].map((tag) => <button key={tag} onClick={() => onTag(tag)}>tag {tag}</button>)}</span>
+    <span className="rail-actions"><button onClick={onAdd}>add lane</button></span>
   </main>;
+}
+
+function useMeasuredWidth(ref: RefObject<HTMLElement | null>, fallback = 800): number {
+  const [width, setWidth] = useState(fallback);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const measure = () => setWidth((current) => {
+      const next = Math.round(node.getBoundingClientRect().width);
+      return next >= 120 ? next : current;
+    });
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
 }
 
 function ShapeStrip({ trajectory, selected, hover, axis, compact = false, label, onSelect, onHover, onAscend }: {
   trajectory: Trajectory; selected: number; hover?: number; axis: { start: number; end: number }; compact?: boolean; label?: string; onSelect: (index: number) => void; onHover: (index?: number) => void; onAscend?: () => void;
 }) {
+  // Pixel-space rendering (workspace-spec v3 §0.1): marks have fixed sizes at
+  // true positions; the SVG viewBox tracks the measured width so nothing
+  // stretches. Density is handled by layoutStrip's binning, never by scaling.
+  const containerRef = useRef<HTMLElement>(null);
+  const width = useMeasuredWidth(containerRef);
   const events = trajectory.events;
-  const min = events[0]?.sequence ?? 0, max = events.at(-1)?.sequence ?? min + 1;
-  const x = (sequence: number) => axisX(sequence, axis);
-  const visible = events.map((event, index) => ({ event, index })).filter(({ event }) => event.sequence >= axis.start && event.sequence <= axis.end);
-  const bands = episodesFor(events);
-  const rewards: Array<{ x: number; value: number }> = []; let reward = 0;
-  visible.forEach(({ event }) => { reward = eventReward(event) ?? reward; rewards.push({ x: x(event.sequence), value: reward }); });
+  const min = events[0]?.sequence ?? 0;
+  const height = compact ? 56 : 200;
+  const x = (sequence: number) => stripX(sequence, axis, width);
+  const layout = layoutStrip(events, axis, width);
+  const visibleCount = layout.mode === "marks" ? layout.marks.length : layout.bins.reduce((total, bin) => total + bin.count, 0) + layout.landmarks.length;
+  const bands = compact ? [] : episodesFor(events);
+  const baseline = compact ? 44 : 105;
+  const markFor = (mark: StripMark) => {
+    if (mark.kind === "error") return <path data-event-index={mark.index} key={`m${mark.index}`} className="event-shape error" d={`M${mark.x - 5},${baseline} L${mark.x},${baseline - 15} L${mark.x + 5},${baseline} Z`} />;
+    if (mark.kind === "context") return <path data-event-index={mark.index} key={`m${mark.index}`} className="event-shape context" d={`M${mark.x},${baseline - 18} l6,8 -6,8 -6,-8 Z`} />;
+    if (mark.kind === "evidence") return <circle data-event-index={mark.index} key={`m${mark.index}`} className="event-shape evidence" cx={mark.x} cy={baseline - 12} r="5" />;
+    if (mark.kind === "tool") return <rect data-event-index={mark.index} key={`m${mark.index}`} className="event-shape tool" x={mark.x - 2} y={baseline - 26} width="4" height="26" />;
+    return <line data-event-index={mark.index} key={`m${mark.index}`} className="event-shape nominal" x1={mark.x} x2={mark.x} y1={baseline - 10} y2={baseline} />;
+  };
+  const rewards: Array<{ x: number; value: number }> = [];
+  if (!compact) {
+    let reward = 0;
+    events.forEach((event) => {
+      if (event.sequence < axis.start || event.sequence > axis.end) return;
+      reward = eventReward(event) ?? reward;
+      rewards.push({ x: x(event.sequence), value: reward });
+    });
+  }
   const rewardMin = Math.min(0, ...rewards.map((point) => point.value)), rewardMax = Math.max(1, ...rewards.map((point) => point.value));
-  const path = rewards.map((point, index) => `${index ? "L" : "M"}${point.x},${182 - ((point.value - rewardMin) / Math.max(1, rewardMax - rewardMin)) * 26}`).join(" ");
+  const rewardPath = rewards.map((point, index) => `${index ? "L" : "M"}${point.x},${182 - ((point.value - rewardMin) / Math.max(1, rewardMax - rewardMin)) * 26}`).join(" ");
   const selectedX = x(events[selected]?.sequence ?? min);
-  return <section className={`shape-strip ${compact ? "compact" : ""}`} aria-label={label ?? "Trajectory shape"} data-selected-x={selectedX.toFixed(4)} data-visible-events={visible.length}>
-    <svg viewBox="0 0 1000 200" preserveAspectRatio="none" onMouseLeave={() => onHover(undefined)} onMouseMove={(pointer) => {
-      const rect = pointer.currentTarget.getBoundingClientRect(); const px = ((pointer.clientX - rect.left) / Math.max(1, rect.width)) * 1000;
-      const nearest = visible.reduce((best, item) => Math.abs(x(item.event.sequence) - px) < Math.abs(x(events[best]?.sequence ?? min) - px) ? item.index : best, visible[0]?.index ?? 0); onHover(nearest);
+  return <section ref={containerRef} className={`shape-strip ${compact ? "compact" : ""}`} aria-label={label ?? "Trajectory shape"} data-selected-x={selectedX.toFixed(4)} data-visible-events={visibleCount} data-strip-mode={layout.mode}>
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} onMouseLeave={() => onHover(undefined)} onMouseMove={(pointer) => {
+      const rect = pointer.currentTarget.getBoundingClientRect();
+      const px = pointer.clientX - rect.left;
+      let nearest: number | undefined; let best = Infinity;
+      events.forEach((event, index) => {
+        if (event.sequence < axis.start || event.sequence > axis.end) return;
+        const distance = Math.abs(x(event.sequence) - px);
+        if (distance < best) { best = distance; nearest = index; }
+      });
+      if (nearest !== undefined) onHover(nearest);
     }} onClick={() => onAscend ? onAscend() : hover !== undefined && onSelect(hover)}>
-      {!compact && <><text className="lane-label" x="20" y="13">episodes</text>{bands.filter((band) => band.end >= axis.start && band.start <= axis.end).map((band) => <g key={band.key} data-episode-key={band.key} data-episode-start={band.start} data-episode-end={band.end}><rect className="episode-band" x={x(Math.max(axis.start, band.start))} y="18" width={Math.max(1, x(Math.min(axis.end, band.end)) - x(Math.max(axis.start, band.start)))} height="23" /><text className="episode-label" x={x(Math.max(axis.start, band.start)) + 4} y="34">{band.label}</text></g>)}</>}
-      <text className="lane-label" x="20" y={compact ? 34 : 61}>events</text>
-      {visible.map(({ event, index }) => { const px = x(event.sequence), offset = compact ? -45 : 0;
-        if (event.kind === "error") return <path data-event-index={index} key={event.id} className="event-shape error" d={`M${px - 5},${105 + offset} L${px},${88 + offset} L${px + 5},${105 + offset} Z`} />;
-        if (event.kind === "tool" || event.kind === "environment_action") return <rect data-event-index={index} key={event.id} className="event-shape tool" x={px - 2} y={75 + offset} width="4" height="30" />;
-        if (event.kind === "reward" || event.kind === "grader") return <circle data-event-index={index} key={event.id} className="event-shape evidence" cx={px} cy={84 + offset} r="5" />;
-        if (event.context || event.alignment_key?.startsWith("context:")) return <path data-event-index={index} key={event.id} className="event-shape context" d={`M${px},${68 + offset} l6,8 -6,8 -6,-8 Z`} />;
-        return <line data-event-index={index} key={event.id} className="event-shape nominal" x1={px} x2={px} y1={94 + offset} y2={105 + offset} />;
+      {!compact && bands.filter((band) => band.end >= axis.start && band.start <= axis.end).map((band) => {
+        const x0 = x(Math.max(axis.start, band.start)), x1 = x(Math.min(axis.end, band.end));
+        return <g key={band.key} data-episode-key={band.key} data-episode-start={band.start} data-episode-end={band.end}><rect className="episode-band" x={x0} y="18" width={Math.max(1, x1 - x0)} height="23" /><text className="episode-label" x={x0 + 4} y="34">{x1 - x0 > 44 ? band.label : ""}</text></g>;
       })}
-      {!compact && <><text className="lane-label" x="20" y="123">context</text>{visible.map(({ event }) => event.context?.input_tokens !== undefined && event.context.capacity ? <rect key={`ctx:${event.id}`} className="context-pressure" x={x(event.sequence) - 2} y={153 - 25 * event.context.input_tokens / event.context.capacity} width="4" height={25 * event.context.input_tokens / event.context.capacity} /> : null)}<text className="lane-label" x="20" y="166">reward</text><path className="reward-curve" d={path} /></>}
-      {hover !== undefined && <line className="skimmer-line" x1={x(events[hover].sequence)} x2={x(events[hover].sequence)} y1="5" y2="195" />}<line data-testid="playhead" className="playhead" x1={selectedX} x2={selectedX} y1="5" y2="195" />
+      {layout.mode === "binned" && layout.bins.map((bin, index) => bin.count ? <rect key={`b${index}`} className={`density-bin ${bin.tools * 2 > bin.count ? "tool-heavy" : ""}`} x={bin.x0} y={baseline - 4 - Math.round((bin.count / layout.peak) * 20)} width={Math.max(1, bin.x1 - bin.x0 - 1)} height={4 + Math.round((bin.count / layout.peak) * 20)} /> : null)}
+      {layout.mode === "binned" ? layout.landmarks.map(markFor) : layout.marks.map(markFor)}
+      {!compact && <>{events.map((event) => event.context?.input_tokens !== undefined && event.context.capacity && event.sequence >= axis.start && event.sequence <= axis.end ? <rect key={`ctx:${event.id}`} className="context-pressure" x={x(event.sequence) - 2} y={153 - 25 * event.context.input_tokens / event.context.capacity} width="4" height={25 * event.context.input_tokens / event.context.capacity} /> : null)}<path className="reward-curve" d={rewardPath} /></>}
+      {hover !== undefined && events[hover] && <line className="skimmer-line" x1={x(events[hover].sequence)} x2={x(events[hover].sequence)} y1="5" y2={height - 5} />}
+      <line data-testid="playhead" className="playhead" x1={selectedX} x2={selectedX} y1="5" y2={height - 5} />
     </svg>
   </section>;
 }
 
 function EpisodeStrip({ trajectory, lane, episodes, selectedEpisode, onDescend }: { trajectory: Trajectory; lane: WorkspaceLane; episodes: Episode[]; selectedEpisode: number; onDescend: (episode: Episode) => void }) {
-  const x = (sequence: number) => axisX(sequence, lane.axis);
+  const containerRef = useRef<HTMLElement>(null);
+  const width = useMeasuredWidth(containerRef);
+  const x = (sequence: number) => stripX(sequence, lane.axis, width);
+  const percent = (px: number) => (px / width) * 100;
   const selectedSequence = trajectory.events[lane.selected]?.sequence ?? trajectory.events[0]?.sequence ?? 0;
-  return <section className="episode-strip" aria-label="Trajectory shape" data-selected-x={x(selectedSequence).toFixed(4)} data-selected-episode={episodes[selectedEpisode]?.key ?? ""}>
+  return <section ref={containerRef} className="episode-strip" aria-label="Trajectory shape" data-selected-x={x(selectedSequence).toFixed(4)} data-selected-episode={episodes[selectedEpisode]?.key ?? ""}>
     <div className="episode-axis">
       {episodes.filter((episode) => episode.end >= lane.axis.start && episode.start <= lane.axis.end).map((episode, index) => {
         const actualIndex = episodes.indexOf(episode);
         const nextStart = episodes[actualIndex + 1]?.start ?? Math.max(episode.end + 1, lane.axis.end);
-        const left = x(Math.max(lane.axis.start, episode.start)) / 10;
-        const right = x(Math.min(lane.axis.end, nextStart)) / 10;
+        const left = percent(x(Math.max(lane.axis.start, episode.start)));
+        const right = percent(x(Math.min(lane.axis.end, nextStart)));
         return <button key={episode.key} className={`episode-button ${actualIndex === selectedEpisode ? "selected" : ""}`} data-episode-index={actualIndex} data-episode-key={episode.key} data-episode-start={episode.start} data-episode-end={episode.end} style={{ left: `${left}%`, width: `${Math.max(0.8, right - left)}%` }} onClick={(event) => { event.stopPropagation(); onDescend(episode); }}>
           <b>{episode.label}</b><small>{episode.inferred ? "inferred" : "adapter"} · {episode.endIndex - episode.startIndex + 1} events</small>
         </button>;
       })}
-      <i className="episode-playhead" style={{ left: `${x(selectedSequence) / 10}%` }} />
+      <i className="episode-playhead" style={{ left: `${percent(x(selectedSequence))}%` }} />
     </div>
     {episodes[selectedEpisode] && <EpisodeSummary trajectory={trajectory} episode={episodes[selectedEpisode]} />}
   </section>;
@@ -174,8 +236,8 @@ function LaneTrack({ lane, data, active, reference, hover, onActivate, onSelect,
   const episodes = trajectory ? episodesFor(trajectory.events) : [];
   const selectedEpisode = episodeIndexForEvent(episodes, selected);
   const episode = episodes[selectedEpisode];
-  return <main tabIndex={0} aria-label={lane.band === "focus" ? "Read trajectory" : `Context lane ${lane.trajectoryId}`} className={`lane-track depth-${depth} ${lane.band}-lane ${active ? "active-zone" : ""} ${reference ? "reference-lane" : ""}`} data-lane-id={lane.id} data-trajectory={lane.trajectoryId} data-depth={depth} data-stored-depth={lane.depth} data-episode={episode?.key ?? ""} data-fidelity={fidelityNames[lane.fidelity]} data-axis-start={lane.axis.start.toFixed(4)} data-axis-end={lane.axis.end.toFixed(4)} onFocus={onActivate} onClick={onActivate}>
-    <header><span><b>{lane.trajectoryId}</b><small>{lane.band}{reference ? " · reference" : ""}</small></span><span className="lane-state">{["", "surface", "episodes", "events", "source"][depth]} · depth {depth}/4 · {fidelityNames[lane.fidelity]}</span></header>
+  return <main tabIndex={0} aria-label={lane.band === "focus" ? "Read trajectory" : `Context lane ${lane.trajectoryId}`} className={`lane-track depth-${depth} ${lane.band}-lane ${active ? "active-zone" : ""} ${reference ? "reference-lane" : ""}`} data-lane-id={lane.id} data-trajectory={lane.trajectoryId} data-depth={depth} data-stored-depth={lane.depth} data-episode={episode?.key ?? ""} data-axis-start={lane.axis.start.toFixed(4)} data-axis-end={lane.axis.end.toFixed(4)} onFocus={onActivate} onClick={onActivate}>
+    <header><span><b>{lane.trajectoryId}</b>{reference && <small>reference</small>}</span><span className="lane-state">{["", "overview", "episodes", "events", "raw"][depth]}</span></header>
     {!trajectory ? <div className="lane-loading">loading trajectory…</div> : depth === 1 ? <ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} compact={lane.band === "context"} label={lane.band === "focus" ? "Trajectory shape" : `Trajectory shape ${lane.trajectoryId}`} onSelect={onSelect} onHover={onHover} /> : depth === 2 ? <EpisodeStrip trajectory={trajectory} lane={lane} episodes={episodes} selectedEpisode={selectedEpisode} onDescend={(target) => onDescend(target)} /> : <><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} compact label="Compressed trajectory shape" onSelect={onSelect} onHover={onHover} onAscend={onAscend} />{depth === 3 && episode && <ScopedEvents trajectory={trajectory} episode={episode} selected={selected} onSelect={onSelect} />}{depth === 4 && trajectory.events[selected] && <SourceRecord event={trajectory.events[selected]} />}</>}
     {trajectory && hover !== undefined && depth === 1 && lane.band === "focus" && <aside className="skim-preview" role="status"><b>#{trajectory.events[hover].sequence} · {trajectory.events[hover].kind}</b><span>{eventText(trajectory.events[hover])}</span></aside>}
   </main>;
@@ -186,7 +248,7 @@ function ContextBand({ lanes, workspace, laneData, hover, activate, select, setL
   activate: (id: string) => void; select: (id: string, index: number) => void; setLaneHover: (id: string, value?: number) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  if (!lanes.length) return <div ref={scrollRef} className="context-band" aria-label="Context band"><span className="context-empty">context lanes</span></div>;
+  if (!lanes.length) return null;
   return <div ref={scrollRef} className="context-band" aria-label="Context band"><VirtualList items={lanes} estimateSize={71} overscan={2} selectedIndex={lanes.findIndex((lane) => lane.id === workspace.active)} scrollRef={scrollRef} className="context-lane-list" itemKey={(lane) => lane.id} renderItem={(lane) => <LaneTrack lane={lane} data={laneData.get(lane.id)} active={workspace.active === lane.id} reference={workspace.reference === lane.id} hover={hover[lane.id]} onActivate={() => activate(lane.id)} onSelect={(value) => select(lane.id, value)} onHover={(value) => setLaneHover(lane.id, value)} onDescend={() => undefined} onAscend={() => undefined} />} /></div>;
 }
 
@@ -205,16 +267,27 @@ function Console({ workspace, lane, data, breadcrumb, resizeMode, onSelect, onHe
   workspace: WorkspaceState; lane?: WorkspaceLane; data?: LaneData; breadcrumb: string; resizeMode: boolean; onSelect: (index: number) => void; onHelp: () => void;
 }) {
   const trajectory = data?.trajectory; const current = trajectory?.events[Math.min(lane?.selected ?? 0, Math.max(0, trajectory.events.length - 1))];
-  const around = lane ? Math.max(1, lane.fidelity + 1) : 1;
+  const around = 2;
   const detailRows = trajectory && current ? trajectory.events.slice(Math.max(0, trajectory.events.indexOf(current) - around), Math.min(trajectory.events.length, trajectory.events.indexOf(current) + around + 1)) : [];
   return <section className="workspace-console" aria-label="Workspace console" data-resize-mode={resizeMode ? "true" : "false"}>
-    <header className="console-header"><div><span className="eyebrow">Console</span><h2>{trajectory?.name ?? trajectory?.id ?? "No lane selected"}</h2><p className="workspace-breadcrumb">{breadcrumb}</p></div>
+    <header className="console-header"><div><h2>{trajectory?.name ?? trajectory?.id ?? "No lane selected"}</h2><p className="workspace-breadcrumb">{breadcrumb}</p></div>
       {trajectory && <div className="judge-list">{judgesFor(trajectory).map((judge, index) => <button key={`${judge.label}:${index}`} className={/false|fail/i.test(judge.value) ? "failure" : judge.label === "verifier" && /true|pass/i.test(judge.value) ? "verifier-pass" : ""} onClick={() => { const found = trajectory.events.findIndex((event) => event.id === judge.eventId); if (found >= 0) onSelect(found); }}><small>{judge.label}</small><b>{judge.value}</b></button>)}</div>}
       <div className="console-meta"><span>reference: <b data-testid="reference-name">{workspace.reference ? workspace.lanes.find((item) => item.id === workspace.reference)?.trajectoryId ?? "none" : "none"}</b></span>{resizeMode && <strong>resize mode · arrows · Esc</strong>}<button onClick={onHelp}>?</button></div>
     </header>
-    <section className="detail-region" aria-label="Selected moment">{detailRows.map((event) => <button key={event.id} className={`moment ${event.id === current?.id ? "selected" : ""}`} onClick={() => onSelect(trajectory!.events.indexOf(event))}><span className="address">{event.sequence}</span><span className="kind-glyph">{glyphForKind(event.kind)}</span><span className="moment-copy"><small>{event.kind}</small><b>{eventText(event)}</b>{event.id === current?.id && lane && lane.fidelity >= 2 && <pre>{preview(eventDetail(event), lane.fidelity >= 5 ? 1600 : 500)}</pre>}{event.id === current?.id && <em>source · {event.source?.path ?? "canonical record"}{event.source?.line ? `:${event.source.line}` : ""}</em>}</span></button>)}</section>
-    <footer className="instrument-keys"><span><kbd>Tab</kbd> zones</span><span><kbd>n</kbd><kbd>p</kbd> sweep</span><span><kbd>Shift+Enter</kbd> promote</span><span><kbd>Ctrl+w</kbd> resize</span>{current && <span className="selection-address">#{current.sequence}</span>}</footer>
+    <section className="detail-region" aria-label="Selected moment">{detailRows.map((event) => <button key={event.id} className={`moment ${event.id === current?.id ? "selected" : ""}`} onClick={() => onSelect(trajectory!.events.indexOf(event))}><span className="address">{event.sequence}</span><span className="kind-glyph">{glyphForKind(event.kind)}</span><span className="moment-copy"><small>{event.kind}</small><b>{eventText(event)}</b>{event.id === current?.id && <pre>{preview(eventDetail(event), 700)}</pre>}{event.id === current?.id && <em>source · {event.source?.path ?? "canonical record"}{event.source?.line ? `:${event.source.line}` : ""}</em>}</span></button>)}</section>
   </section>;
+}
+
+
+const KEYBAR_COLLECTION: CommandId[] = [commandIds.workspace.descend, commandIds.workspace.addLane, commandIds.view.fidelityUp, commandIds.group.search, commandIds.workspace.toggleRail, commandIds.workspace.cycleNext, commandIds.view.toggleHelp];
+const KEYBAR_LANE: CommandId[] = [commandIds.trajectory.next, commandIds.trajectory.nextError, commandIds.workspace.descend, commandIds.workspace.ascend, commandIds.view.zoomIn, commandIds.workspace.nextRollout, commandIds.workspace.closeLane, commandIds.workspace.cycleNext, commandIds.view.toggleHelp];
+
+function KeyBar({ module, selection }: { module: "collection" | "lane"; selection?: string }) {
+  const ids = module === "collection" ? KEYBAR_COLLECTION : KEYBAR_LANE;
+  return <footer className="keybar" aria-label="Active module keys">
+    {ids.map((id) => { const command = commandDefinition(id); return <button key={id} className="keybar-chip" onClick={() => dispatchCommand(id)}><kbd>{bindingLabel(id)}</kbd><span>{command.label}</span></button>; })}
+    {selection && <span className="selection-address">{selection}</span>}
+  </footer>;
 }
 
 function Sash({ name, orientation, onPointerDown, onReset }: { name: SeamName; orientation: "horizontal" | "vertical"; onPointerDown: (event: ReactPointerEvent<HTMLDivElement>, name: SeamName) => void; onReset: (name: SeamName) => void }) {
@@ -228,8 +301,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
   const [browse, setBrowse] = useState<BrowseResponse>(() => fakeBrowse(initialTrajectory ?? sampleTrajectory));
   const [laneData, setLaneData] = useState<Map<string, LaneData>>(() => new Map(initialTrajectory ? [[laneId("sample", initialTrajectory.id), { trajectory: initialTrajectory, analysis: null }]] : []));
   const laneDataRef = useRef(laneData); laneDataRef.current = laneData;
-  const [railFidelity, setRailFidelity] = useState(3);
-  const [tags, setTags] = useState<Map<string, number>>(new Map());
+  const [railFidelity, setRailFidelity] = useState(1);
   const [hover, setHover] = useState<Record<string, number | undefined>>({});
   const [help, setHelp] = useState(false); const [resizeMode, setResizeMode] = useState(false); const [error, setError] = useState("");
   const [presentation, setPresentation] = useState<PresentationConfig>();
@@ -242,7 +314,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
   const pendingReplace = useRef<WorkspaceState | undefined>(undefined); const replaceFrame = useRef<number | undefined>(undefined);
   const legacyReadIntent = useRef((() => { const params = new URLSearchParams(window.location.search); return (params.get("mode") === "read" || params.get("view") === "read") && !params.get("trajectory_id"); })());
 
-  const ordered = useMemo(() => [...browse.trajectories].sort((a, b) => attentionScore(b) - attentionScore(a)), [browse]);
+  const ordered = browse.trajectories;
   const filtered = useMemo(() => ordered.filter((row) => !workspace.railQuery || `${row.trajectory.id} ${row.source_name} ${row.case_name ?? ""} ${row.group_name ?? ""}`.toLowerCase().includes(workspace.railQuery.toLowerCase())), [ordered, workspace.railQuery]);
   const boundedRail = Math.min(workspace.railSelected, Math.max(0, filtered.length - 1)); const selectedRow = filtered[boundedRail];
   const activeLane = workspace.active === "rail" ? undefined : workspace.lanes.find((lane) => lane.id === workspace.active);
@@ -357,7 +429,10 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
     const base: WorkspaceLane = { id, sourceId: row.source_id, trajectoryId: row.trajectory.id, band, selected: preserve?.selected ?? firstAnomaly(loaded.trajectory), depth: preserve?.depth ?? 1, fidelity: preserve?.fidelity ?? 3, axis: preserve?.axis ?? { start: loaded.trajectory.events[0]?.sequence ?? 0, end: loaded.trajectory.events.at(-1)?.sequence ?? 1 }, descentStack: preserve?.descentStack ?? [] };
     putLaneData(id, { trajectory: loaded.trajectory, analysis: null, presentation: loaded.presentation });
     change((current) => {
-      if (add || !current.lanes.length) return { ...current, lanes: [...current.lanes, base], active: id, railExpanded: current.railExpanded };
+      // `a` piles lanes in without stealing focus from the collection;
+      // opening (Enter) is the action that moves focus.
+      if (add) return { ...current, lanes: [...current.lanes, base], railExpanded: current.railExpanded };
+      if (!current.lanes.length) return { ...current, lanes: [base], active: id };
       if (preserve) return { ...current, lanes: current.lanes.map((lane) => lane.id === preserve.id ? { ...base, band: preserve.band } : lane), active: id, reference: current.reference === preserve.id ? undefined : current.reference };
       const replaceId = current.lanes.find((lane) => lane.id === current.active && lane.band === "focus")?.id ?? current.lanes.find((lane) => lane.id === lastFocus.current && lane.band === "focus")?.id ?? current.lanes.find((lane) => lane.band === "focus")?.id;
       if (!replaceId) return { ...current, lanes: [...current.lanes, base], active: id };
@@ -416,7 +491,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
   const closeLane = () => { if (!activeLane) return; deleteLaneData(activeLane.id); change((current) => { const lanes = current.lanes.filter((lane) => lane.id !== activeLane.id); return { ...current, lanes, railExpanded: lanes.length ? current.railExpanded : true, active: lanes[0]?.id ?? "rail", reference: current.reference === activeLane.id ? undefined : current.reference }; }); };
   const promoteDemote = () => { if (!activeLane) return; change((current) => { const lane = current.lanes.find((item) => item.id === activeLane.id); if (!lane) return current; const counterpart = lane.band === "context" ? current.lanes.find((item) => item.id === lastFocus.current && item.band === "focus") ?? current.lanes.find((item) => item.band === "focus") : current.lanes.find((item) => item.band === "context"); if (!counterpart) return current; return { ...current, lanes: current.lanes.map((item) => item.id === lane.id ? { ...item, band: counterpart.band } : item.id === counterpart.id ? { ...item, band: lane.band } : item) }; }); };
   const jump = (delta: number) => { const nextIndex = jumpIndex.current + delta; if (nextIndex < 0 || nextIndex >= jumpList.current.length) return; jumpIndex.current = nextIndex; restoring.current = true; const next = jumpList.current[nextIndex]; applyWorkspace(next, false); next.lanes.forEach((lane) => void ensureLaneData(lane)); restoring.current = false; };
-  const adjustFidelity = (delta: number, all: boolean) => { if (workspaceRef.current.active === "rail" && !all) { setRailFidelity((value) => Math.max(0, Math.min(5, value + delta))); return; } change((current) => ({ ...current, lanes: current.lanes.map((lane) => all || lane.id === current.active ? { ...lane, fidelity: Math.max(0, Math.min(5, lane.fidelity + delta)) } : lane) }), false); };
+  const adjustFidelity = (delta: number) => setRailFidelity((value) => Math.max(0, Math.min(2, value + delta)));
   const adjustZoom = (factor: number | "fit", all: boolean) => change((current) => ({ ...current, lanes: current.lanes.map((lane) => { if (!all && lane.id !== current.active) return lane; const data = laneDataRef.current.get(lane.id); if (!data) return lane; const min = data.trajectory.events[0]?.sequence ?? 0, max = data.trajectory.events.at(-1)?.sequence ?? 1, sequence = data.trajectory.events[lane.selected]?.sequence ?? min; return { ...lane, axis: factor === "fit" ? { start: min, end: max } : zoomWindow(lane.axis, sequence, factor, min, max) }; }) }), false);
 
   const resizeNearest = (key: string) => {
@@ -440,8 +515,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
     // never restores a stale rail selection.
     [commandIds.workspace.ascend]: () => { if (resizeMode) { setResizeMode(false); return; } if (!activeLane) return false; if (effectiveDepth(activeLane) > 1) ascendLane(activeLane.id); else closeLane(); },
     [commandIds.workspace.jumpBack]: () => jump(-1), [commandIds.workspace.jumpForward]: () => jump(1), [commandIds.workspace.resizeMode]: () => setResizeMode(true),
-    [commandIds.view.fidelityUp]: () => adjustFidelity(1, false), [commandIds.view.fidelityDown]: () => adjustFidelity(-1, false),
-    [commandIds.view.fidelityUpAll]: () => adjustFidelity(1, true), [commandIds.view.fidelityDownAll]: () => adjustFidelity(-1, true),
+    [commandIds.view.fidelityUp]: () => adjustFidelity(1), [commandIds.view.fidelityDown]: () => adjustFidelity(-1),
     [commandIds.view.zoomIn]: () => activeLane ? adjustZoom(2, false) : false, [commandIds.view.zoomOut]: () => activeLane ? adjustZoom(0.5, false) : false, [commandIds.view.zoomFit]: () => activeLane ? adjustZoom("fit", false) : false,
     [commandIds.view.zoomInAll]: () => activeLane ? adjustZoom(2, true) : false, [commandIds.view.zoomOutAll]: () => activeLane ? adjustZoom(0.5, true) : false, [commandIds.view.zoomFitAll]: () => activeLane ? adjustZoom("fit", true) : false,
     [commandIds.view.toggleHelp]: () => setHelp(true),
@@ -452,12 +526,6 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
     [commandIds.trajectory.nextError]: () => jumpEvent((event) => event.kind === "error"), [commandIds.trajectory.nextContext]: () => jumpEvent((event) => !!event.context || !!event.alignment_key?.startsWith("context:")),
     [commandIds.trajectory.nextReward]: () => jumpEvent((event) => event.kind === "reward" || event.kind === "grader"), [commandIds.trajectory.nextFinding]: () => { if (!activeLane) return false; const ids = new Set((laneData.get(activeLane.id)?.analysis?.analysis.findings ?? []).flatMap((finding) => finding.event_ids ?? [])); jumpEvent((event) => ids.has(event.id)); },
   }, !help);
-  useCommands("group", {
-    [commandIds.group.tagVerdict1]: () => { if (!selectedRow) return false; setTags((current) => new Map(current).set(selectedRow.trajectory.id, 1)); change((current) => ({ ...current, railSelected: Math.min(filtered.length - 1, current.railSelected + 1) })); },
-    [commandIds.group.tagVerdict2]: () => { if (!selectedRow) return false; setTags((current) => new Map(current).set(selectedRow.trajectory.id, 2)); change((current) => ({ ...current, railSelected: Math.min(filtered.length - 1, current.railSelected + 1) })); },
-    [commandIds.group.tagVerdict3]: () => { if (!selectedRow) return false; setTags((current) => new Map(current).set(selectedRow.trajectory.id, 3)); change((current) => ({ ...current, railSelected: Math.min(filtered.length - 1, current.railSelected + 1) })); },
-    [commandIds.group.tagVerdict4]: () => { if (!selectedRow) return false; setTags((current) => new Map(current).set(selectedRow.trajectory.id, 4)); change((current) => ({ ...current, railSelected: Math.min(filtered.length - 1, current.railSelected + 1) })); },
-  }, !help && workspace.active === "rail");
 
   useEffect(() => {
     if (!resizeMode) return;
@@ -489,7 +557,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
     <button className="theme-toggle" aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`} onClick={() => setTheme((current) => current === "light" ? "dark" : "light")}>{theme}</button>
     {error && <div className="instrument-error" role="alert">{error}</div>}{presentation?.notices?.map((notice) => <div className="presentation-notice" role="status" key={notice}>{notice}</div>)}
     <div className="rack-body">
-      {workspace.railExpanded && <Rail root={railRef} rows={filtered} workspace={{ ...workspace, railSelected: boundedRail }} fidelity={railFidelity} tags={tags} onActivate={() => change((current) => ({ ...current, active: "rail" }))} onSelect={(index) => change((current) => ({ ...current, railSelected: index, active: "rail" }))} onOpen={() => openSelected(false)} onAdd={() => openSelected(true)} onQuery={(railQuery) => change((current) => { const next = ordered.filter((row) => !railQuery || `${row.trajectory.id} ${row.source_name} ${row.case_name ?? ""} ${row.group_name ?? ""}`.toLowerCase().includes(railQuery.toLowerCase())); const kept = selectedRow ? next.findIndex((row) => rowKey(row) === rowKey(selectedRow)) : -1; return { ...current, railQuery, railSelected: kept >= 0 ? kept : 0 }; })} onTag={(tag) => { if (!selectedRow) return; setTags((current) => new Map(current).set(selectedRow.trajectory.id, tag)); }} />}
+      {workspace.railExpanded && <Rail root={railRef} rows={filtered} workspace={{ ...workspace, railSelected: boundedRail }} fidelity={railFidelity} onActivate={() => change((current) => ({ ...current, active: "rail" }))} onSelect={(index) => change((current) => ({ ...current, railSelected: index, active: "rail" }))} onOpen={() => openSelected(false)} onAdd={() => openSelected(true)} onQuery={(railQuery) => change((current) => { const next = ordered.filter((row) => !railQuery || `${row.trajectory.id} ${row.source_name} ${row.case_name ?? ""} ${row.group_name ?? ""}`.toLowerCase().includes(railQuery.toLowerCase())); const kept = selectedRow ? next.findIndex((row) => rowKey(row) === rowKey(selectedRow)) : -1; return { ...current, railQuery, railSelected: kept >= 0 ? kept : 0 }; })} />}
       <Sash name="rail" orientation="vertical" onPointerDown={beginResize} onReset={resetSeam} />
       <section ref={stageRef} className="workspace-stage" aria-label="Trajectory stage">
         <div ref={focusRef} className={`focus-band direction-${workspace.direction}`} aria-label="Focus band">
@@ -503,6 +571,7 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
     </div>
     <Sash name="console" orientation="horizontal" onPointerDown={beginResize} onReset={resetSeam} />
     <Console workspace={workspace} lane={activeLane} data={activeLane ? laneData.get(activeLane.id) : undefined} breadcrumb={breadcrumb} resizeMode={resizeMode} onSelect={(index) => activeLane && selectEvent(activeLane.id, index)} onHelp={() => setHelp(true)} />
+    <KeyBar module={workspace.active === "rail" ? "collection" : "lane"} selection={activeLane && laneData.get(activeLane.id)?.trajectory.events[activeLane.selected] ? `#${laneData.get(activeLane.id)!.trajectory.events[Math.min(activeLane.selected, laneData.get(activeLane.id)!.trajectory.events.length - 1)].sequence}` : undefined} />
     {help && <HelpOverlay onClose={() => setHelp(false)} />}
   </div></ViewerProviderContext.Provider>;
 }

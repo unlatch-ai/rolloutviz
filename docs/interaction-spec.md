@@ -158,11 +158,9 @@ Keep existing bindings. Additions (conflict-checked per scope):
 | `trajectory.replay` | `Shift+R` | trajectory |
 | `trajectory.pivotAggregate` | `.` | trajectory |
 | `trajectory.dropMarker` / `cycleMarkers` | `m` / `Shift+M` | trajectory |
-| `view.fidelityUp` / `fidelityDown` | `]` / `[` | all |
-| `view.fidelityUpAll` / `fidelityDownAll` | `}` / `{` | workspace |
+| `view.fidelityUp` / `fidelityDown` | `]` / `[` | all (collection representation) |
 | `view.zoomIn` / `zoomOut` / `zoomFit` | `+` / `-` / `0` | trajectory, comparison |
 | `view.zoomInAll` / `zoomOutAll` / `zoomFitAll` | `>` / `<` / `)` | workspace |
-| `group.tagVerdict*` | `1..4` | group |
 | `comparison.toggleDivergenceCurve` | `Shift+D` | comparison |
 
 ## 10. Visual and semantic invariants

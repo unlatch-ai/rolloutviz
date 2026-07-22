@@ -241,3 +241,26 @@ kbd { border: 1px solid var(--hairline); border-bottom-width: 2px; border-radius
 .workspace-console .instrument-keys { position: absolute; bottom: 0; left: 0; right: 0; padding-left: calc(var(--rail-width) + 14px); }
 .virtual-list { position: relative; }.virtual-row { position: absolute; top: 0; left: 0; right: 0; }
 @media (max-width: 900px) { .workspace-rack { min-width: 760px; }.console-header .judge-list { display: none; } }
+
+/* --- truth-first collection strips --- */
+.cat-line { position: relative; display: inline-block; height: 4px; background: var(--hairline); }
+.strip-badge { position: absolute; right: -4px; top: -14px; font-style: normal; font-size: 10px; color: var(--fail-policy); }
+.strip-landmark { position: absolute; top: -3px; width: 4px; height: 10px; border-radius: 1px; }
+.strip-landmark.error { background: var(--fail-policy); }
+.strip-landmark.context { background: var(--ctx); }
+.strip-landmark.evidence { background: var(--good); }
+.cat-glyphs .g-error { color: var(--fail-policy); font-weight: 700; }
+.cat-glyphs .g-context { color: var(--ctx); font-weight: 700; }
+.cat-glyphs .g-evidence { color: var(--good); font-weight: 700; }
+.cat-glyphs .g-gap { opacity: 0; }
+
+/* --- density bins (pixel-space strip) --- */
+.density-bin { fill: var(--muted); opacity: 0.65; }
+.density-bin.tool-heavy { fill: var(--ink-secondary); }
+
+/* --- global keybar: the active module's real bindings --- */
+.keybar { display: flex; gap: 2px; align-items: center; padding: 5px 12px; border-top: 1px solid var(--hairline); background: var(--surface); overflow-x: auto; }
+.keybar-chip { display: inline-flex; gap: 6px; align-items: baseline; border: 0; background: none; color: var(--ink-secondary); font: inherit; font-size: 11px; padding: 3px 7px; cursor: pointer; white-space: nowrap; }
+.keybar-chip:hover { background: var(--page); color: var(--ink); }
+.keybar-chip kbd { font-family: ui-monospace, Menlo, monospace; font-size: 10px; border: 1px solid var(--hairline); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; color: var(--ink); background: var(--surface); }
+.keybar .selection-address { margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--muted); }

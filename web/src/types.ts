@@ -259,6 +259,9 @@ export interface BrowseTrajectory {
   group_name?: string;
   trajectory: Omit<Trajectory, "events">;
   metrics: BrowseMetrics;
+  /** Compact truthful shape summary (see instrument.summarizeShape). Absent
+   * until the provider supplies it; renderers must not fabricate texture. */
+  shape?: { events: number; slots: Array<{ count: number; tools: number; landmark?: "error" | "context" | "evidence" }> };
 }
 
 export interface BrowseMetrics extends GroupMetrics {
