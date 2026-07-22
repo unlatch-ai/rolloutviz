@@ -7,9 +7,8 @@ Working reference implementations of the interaction model live in
 `web/concepts/*.html` — treat them as executable spec for feel and keys,
 not as production code or visual design.
 
-The two tests for any screen: (1) it must be describable in this spec's
-vocabulary; (2) it must survive being rendered as a TUI without losing its
-structure.
+Every screen must be describable in this spec's vocabulary and remain
+operable from both keyboard and pointer input.
 
 ## 1. Modes
 
@@ -180,7 +179,7 @@ Keep existing bindings. Additions (conflict-checked per scope):
    every depth; every summary one descent from raw source.
 6. Icons: bundled open-source set (Lucide; embedded, no CDN) mapped from a
    semantic token table `kind → {icon, unicode glyph, label}`; the glyph
-   column serves the TUI and high-density views; Tier C rebinds by *naming*
+   column serves high-density views; Tier C rebinds by *naming*
    bundled icons, never supplying image data.
 7. Ship complete defaults (icons, 2–3 validated palettes); customization is
    token override with contrast validation, not design-from-scratch.
@@ -213,14 +212,9 @@ Mild-attention states such as stale, truncated, or partial data use muted ink
 with dashed or hollow shapes and no hue. Inferred and Tier-A data use muted ink
 with a hatched texture and no hue.
 
-The TUI maps `--ctx`, `--fail-policy`, `--fail-infra`, and `--good` to the
-ANSI-16 blue, red, yellow, and green codes respectively. If `NO_COLOR` is set,
-it emits no color escape codes.
+## 11. CLI control plane
 
-## 11. TUI
-
-A second renderer of the same spec, in the same binary (`--tui`): same
-modes, same command grammar, glyph column instead of SVG. v1 TUI scope:
-Browse (one fidelity-governed rail), Read (strip + event list, depth/
-fidelity/zoom/landmarks), pair compare, search. Artifacts open via
-`$EDITOR`/browser handoff.
+The browser is the only trajectory renderer. The CLI provides setup, format
+inspection, structured trajectory queries, and named-workspace commands. A
+human or coding agent can choose trajectory IDs and update an already-open GUI
+without duplicating the visual interaction model in a terminal.

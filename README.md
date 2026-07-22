@@ -25,8 +25,9 @@ npm install --global rlviz
 curl -fsSL https://rlviz.dev/install.sh | sh
 ```
 
-Run `rlviz demo` for three deterministic synthetic examples: a coding trace, a
-research trace, and a 16-rollout checkout cohort.
+Run `rlviz` with no source to restore the last usable trace or, on first use,
+open three deterministic synthetic examples. `rlviz guide` prints the same
+concise guide available as a workspace module in the viewer.
 
 ## What it does
 
@@ -36,7 +37,7 @@ research trace, and a 16-rollout checkout cohort.
   adjustable fidelity and depth, trial grouping, landmarks, and a draggable
   timeline viewport.
 - Arranges rollout modules as rows or columns, pins rollout-specific detail,
-  and keeps the active module's shortcuts visible.
+  and shows the active module's shortcuts in the Guide.
 - Compares trajectories with deterministic behavioral alignment and a first
   meaningful divergence.
 - Runs locally: the CLI binds to loopback, makes no outbound requests during
@@ -44,6 +45,14 @@ research trace, and a 16-rollout checkout cohort.
 
 RLViz does not run agents, execute recorded tools, train models, manage prompts,
 or provide hosted monitoring.
+
+Coding agents can query the local index and compose the browser workspace
+without rendering traces in the terminal:
+
+```bash
+rlviz trajectories ./path/to/rollout.ndjson --failed --json
+rlviz workspace open ./path/to/rollout.ndjson --trajectory TRAJECTORY_ID --json
+```
 
 ## Unsupported formats
 
@@ -70,6 +79,7 @@ See the [adapter authoring guide](https://rlviz.dev/adapter-authoring.html) and
 ## Documentation
 
 - [User documentation](https://rlviz.dev/docs.html)
+- [Viewer guide](https://rlviz.dev/guide.html)
 - [Product scope](docs/product-spec.md)
 - [Architecture](docs/architecture.md)
 - [Data model](docs/data-model.md)

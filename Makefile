@@ -47,7 +47,6 @@ site: webapp
 
 test:
 	go test ./...
-	cd third_party/bubbletea && go test ./...
 	npm --prefix web test
 	$(MAKE) webapp-test
 	npm --prefix packages/npm test
@@ -69,7 +68,6 @@ lint:
 
 check: lint
 	go test ./...
-	cd third_party/bubbletea && go test ./...
 	npm --prefix web test
 	$(MAKE) webapp-test
 	npm --prefix packages/npm test

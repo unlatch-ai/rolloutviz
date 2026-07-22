@@ -29,6 +29,8 @@ export interface WorkspaceState {
   railQuery: string;
   railSelected: number;
   collectionView: CollectionView;
+  guideOpen: boolean;
+  settingsOpen: boolean;
   lanes: WorkspaceLane[];
   /** Rollout-pinned detail modules. Values are lane IDs. */
   details: string[];
@@ -52,6 +54,8 @@ export function emptyWorkspace(): WorkspaceState {
     railQuery: "",
     railSelected: 0,
     collectionView: "rollouts",
+    guideOpen: true,
+    settingsOpen: true,
     lanes: [],
     details: [],
     direction: "rows",
@@ -103,7 +107,11 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | undefined {
   const details = Array.isArray(raw.details) ? [...new Set(raw.details.filter((id): id is string => typeof id === "string" && ids.has(id)))] : [];
   const detailTargets = new Set(details.map((id) => `detail:${id}`));
   const railExpanded = raw.railExpanded !== false || lanes.length === 0;
-  const requestedActive = raw.active === "rail" || raw.active === "detail" || (typeof raw.active === "string" && (ids.has(raw.active) || detailTargets.has(raw.active))) ? raw.active : "rail";
+  // Older saved/read links with lanes keep their existing topology. A truly
+  // empty legacy workspace gets the new first-run Guide.
+  const guideOpen = typeof raw.guideOpen === "boolean" ? raw.guideOpen : lanes.length === 0;
+  const settingsOpen = typeof raw.settingsOpen === "boolean" ? raw.settingsOpen : lanes.length === 0;
+  const requestedActive = raw.active === "rail" || (raw.active === "detail" && lanes.length > 0) || (raw.active === "guide" && guideOpen) || (raw.active === "settings" && settingsOpen) || (typeof raw.active === "string" && (ids.has(raw.active) || detailTargets.has(raw.active))) ? raw.active : "rail";
   const layout = input.version === 3 ? normalizeDockLayout(raw.layout) : undefined;
   return {
     version: 3,
@@ -111,6 +119,8 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | undefined {
     railQuery: typeof raw.railQuery === "string" ? raw.railQuery.slice(0, 500) : "",
     railSelected: clamp(finite(raw.railSelected) ? Math.round(raw.railSelected) : 0, 0, Number.MAX_SAFE_INTEGER),
     collectionView: raw.collectionView === "trials" ? "trials" : "rollouts",
+    guideOpen,
+    settingsOpen,
     lanes,
     details,
     direction: raw.direction === "columns" ? "columns" : "rows",
@@ -155,6 +165,8 @@ export function serializeWorkspace(workspace: WorkspaceState): string {
 export function workspaceTopologyKey(workspace: WorkspaceState): string {
   return JSON.stringify({
     rail: workspace.railExpanded,
+    guide: workspace.guideOpen,
+    settings: workspace.settingsOpen,
     lanes: workspace.lanes.map((lane) => lane.id).sort(),
     details: [...workspace.details].sort(),
   });
@@ -201,7 +213,7 @@ export function snapshotLabel(workspace: WorkspaceState): string {
   const focus = workspace.lanes.filter((lane) => lane.band === "focus").length;
   const context = workspace.lanes.length - focus;
   const detailLane = workspace.active.startsWith("detail:") ? workspace.active.slice(7) : undefined;
-  const active = workspace.active === "rail" ? "rail" : workspace.active === "detail" ? "detail" : detailLane ? `detail ${workspace.lanes.find((lane) => lane.id === detailLane)?.trajectoryId ?? "rollout"}` : workspace.lanes.find((lane) => lane.id === workspace.active)?.trajectoryId ?? "lane";
+  const active = workspace.active === "rail" ? "rail" : workspace.active === "guide" ? "guide" : workspace.active === "detail" ? "detail" : detailLane ? `detail ${workspace.lanes.find((lane) => lane.id === detailLane)?.trajectoryId ?? "rollout"}` : workspace.lanes.find((lane) => lane.id === workspace.active)?.trajectoryId ?? "lane";
   return `${workspace.lanes.length} lane${workspace.lanes.length === 1 ? "" : "s"} · ${focus} focus${context ? ` + ${context} context` : ""} · ${active}`;
 }
 import type { SerializedDockview } from "dockview";

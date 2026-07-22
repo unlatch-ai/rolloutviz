@@ -99,7 +99,7 @@ palette names remain validation errors. Typography, spacing, selectors, CSS
 functions, and URLs are not configurable.
 
 The older `theme` map remains schema-bounded for v1alpha1 compatibility. New
-configuration should use `palette` so browser and TUI semantics stay aligned.
+configuration should use `palette` so browser and exported semantics stay aligned.
 
 `inspector.sections` is an exact ordered list of one to ten core-owned section
 IDs: `properties`, `context`, `source`, `input`, `output`, `content`, `metadata`,

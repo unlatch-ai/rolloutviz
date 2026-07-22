@@ -12,6 +12,7 @@ work, and `later` is an intended capability without a committed release.
 | Workflow | User outcome | Status |
 | --- | --- | --- |
 | Open a local trace | Run `rlviz open PATH`; inspect it in a loopback-only viewer without mutating or uploading it | current |
+| Resume or learn without a source | Run `rlviz` or `rlviz open`; restore the last usable source or open bundled samples on first use | current |
 | Open in the browser | Drop a modest trace into the browser viewer; parsing and indexing stay in the tab | current |
 | Browse a collection | Filter rollouts, change visual fidelity, switch between a flat rollout list and trial groups, and open or add a rollout | current |
 | Inspect a rollout | Move through events and landmarks, change depth and fidelity, adjust the timeline viewport, and inspect normalized and raw source data | current |
@@ -20,7 +21,8 @@ work, and `later` is an intended capability without a committed release.
 | Triage a rollout group | Inspect outcome and metric distributions, sort or filter trajectories, and jump to representative or failing rollouts | current |
 | Compare behavior | Align two trajectories around behavioral anchors and inspect their first meaningful divergence and structured differences | current |
 | Extend an unsupported format | Scaffold, trust, validate, and run a local adapter without changing the viewer | current |
-| Configure the viewer | Complete first-run setup and edit layout, theme, fidelity, and keybindings in one documented config | next |
+| Configure the viewer | Use the default Settings module for theme, data opening, and format guidance | current |
+| Let an agent compose the GUI | Query canonical trajectories and open or update named browser workspaces from structured CLI commands | current |
 | Inspect alignment in context | Overlay aligned reference events and divergence evidence directly on rollout lanes | next |
 | Hand work to an agent | Generate a local workbook that gives a coding agent bounded trace context and explicit tasks | next |
 | Use one public surface | Read the short product explanation, install, open a trace, and continue into the viewer on `rlviz.dev` | current |
@@ -58,13 +60,15 @@ work, and `later` is an intended capability without a committed release.
 ### Workspace and interaction
 
 - `current` Docked collection, rollout lanes, global detail, and rollout-pinned detail modules.
+- `current` Docked Guide module backed by the same agent-readable CLI and public documentation.
 - `current` Rows-first additional rollouts, optional columns, pointer docking, and keyboard move/resize modes.
 - `current` `Alt` + arrow spatial navigation and `Tab` cycling.
-- `current` One always-visible keybar generated from the active module's command bindings.
-- `current` Customizable keymap storage and active-shortcut help.
+- `current` Active-module shortcuts in the docked Guide, without consuming permanent viewport height.
+- `current` Customizable keymap storage and toggleable move/resize modes.
+- `current` Docked Settings module for appearance, browser data loading, and adapter guidance.
 - `current` Shareable logical workspace links and bounded, device-local dock geometry.
 - `current` Device-local editable titles and descriptions for collections and trajectories, without changing source traces.
-- `next` Onboarding and a complete keybinding-remap UI backed by the shared config.
+- `next` Complete keybinding-remap UI backed by the shared config.
 
 ### Comparison and derived analysis
 
@@ -80,7 +84,8 @@ work, and `later` is an intended capability without a committed release.
 - `current` CLI daemon viewer and zero-upload WebAssembly browser viewer sharing one instrument UI.
 - `current` Light/dark themes, presentation palettes, semantic glyphs, and accessible text equivalents.
 - `current` One public surface at `rlviz.dev`, external-user documentation, and plain metadata with a product-specific favicon and social preview.
-- `next` Agent-readable workbooks and setup instructions.
+- `current` Agent-readable setup instructions plus query and named-workspace control commands.
+- `next` Agent-readable analysis workbooks.
 
 ## Product boundaries
 

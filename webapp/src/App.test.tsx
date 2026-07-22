@@ -1,0 +1,29 @@
+import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./wasm", () => ({
+  limits: vi.fn(async () => ({ maxRecommendedBytes: 32 << 20 })),
+  parseTrace: vi.fn(async () => ({ collection: {}, collection_id: "sample" })),
+}));
+vi.mock("./provider", () => ({ createInMemoryProvider: vi.fn(() => ({ kind: "sample" })) }));
+vi.mock("../../web/src/App", () => ({ App: ({ setup }: { setup: { mode: string; status: string; selectedSample: string } }) => <main>sample viewer ready<span>{setup.mode}</span><span>{setup.status}</span><span>{setup.selectedSample}</span></main> }));
+
+import { BrowserApp } from "./App";
+
+describe("browser startup", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("opens the bundled checkout cohort without an initial click", async () => {
+    const fetch = vi.fn(async (_input: RequestInfo | URL) => new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    render(<BrowserApp />);
+
+    expect(await screen.findByText("sample viewer ready")).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(String(fetch.mock.calls[0][0])).toContain("checkout-cohort");
+    expect(screen.getByText("browser")).toBeInTheDocument();
+    expect(screen.getByText(/checkout-cohort\.ndjson is open/)).toBeInTheDocument();
+    expect(screen.getByText("checkout-cohort.ndjson")).toBeInTheDocument();
+    expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
+  });
+});

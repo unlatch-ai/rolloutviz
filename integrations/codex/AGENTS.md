@@ -3,15 +3,21 @@
 Use RLViz when the user asks to inspect, open, or explain a rollout,
 trajectory, episode, trace, or agent-environment run.
 
+Run `rlviz guide --json` for the version-matched viewer workflow and keyboard
+controls. The same guide is available as a docked module in the viewer.
+
 ## Open a trace
 
 1. Use an exact path supplied by the user. Otherwise locate likely files with
    read-only search commands such as `rg --files` and inspect only enough data to
    identify the requested run.
 2. Confirm `rlviz` is available with `command -v rlviz`.
-3. Run `rlviz open --json "<source>"`. Treat stdout as structured output. Report
-   stderr separately when the command fails.
-4. Return the viewer URL and the resolved source path. Do not keep a foreground
+3. Use `rlviz trajectories "<source>" --json` to find relevant IDs when the
+   request is narrower than the whole collection.
+4. Run `rlviz workspace open "<source>" --trajectory "<id>" --json` to compose
+   a named GUI workspace, or `rlviz open --json "<source>"` to open the full
+   collection. Treat stdout as structured output and report stderr separately.
+5. Return the viewer URL and the resolved source path. Do not keep a foreground
    server running when `open` succeeds.
 
 ## Unsupported formats

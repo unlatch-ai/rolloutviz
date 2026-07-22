@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	StatusPath   = "/api/v1/daemon/status"
-	StopPath     = "/api/v1/daemon/stop"
-	RegisterPath = "/api/v1/sources"
-	maxResponse  = 1 << 20
+	StatusPath    = "/api/v1/daemon/status"
+	StopPath      = "/api/v1/daemon/stop"
+	RegisterPath  = "/api/v1/sources"
+	WorkspacePath = "/api/v1/workspaces"
+	maxResponse   = 1 << 20
 )
 
 // Status describes a daemon that accepted an authenticated health request.
@@ -37,6 +38,12 @@ type RegisterResponse struct {
 	SourceID string `json:"source_id,omitempty"`
 	Path     string `json:"path"`
 	URL      string `json:"url"`
+}
+
+type WorkspaceResponse struct {
+	ID        string          `json:"workspace_id"`
+	Revision  int64           `json:"revision"`
+	Workspace json.RawMessage `json:"workspace"`
 }
 
 // Client calls the private loopback daemon API. HTTP may be supplied by tests
@@ -91,6 +98,33 @@ func (client Client) Register(ctx context.Context, metadata Metadata, request Re
 	}
 	if response.URL == "" {
 		return RegisterResponse{}, fmt.Errorf("daemon register response has no viewer URL")
+	}
+	return response, nil
+}
+
+func (client Client) CreateWorkspace(ctx context.Context, metadata Metadata, workspace any) (WorkspaceResponse, error) {
+	var response WorkspaceResponse
+	if err := client.doJSON(ctx, metadata, http.MethodPost, WorkspacePath, workspace, &response); err != nil {
+		return WorkspaceResponse{}, err
+	}
+	if response.ID == "" || len(response.Workspace) == 0 {
+		return WorkspaceResponse{}, fmt.Errorf("daemon workspace response is incomplete")
+	}
+	return response, nil
+}
+
+func (client Client) Workspace(ctx context.Context, metadata Metadata, id string) (WorkspaceResponse, error) {
+	var response WorkspaceResponse
+	if err := client.doJSON(ctx, metadata, http.MethodGet, WorkspacePath+"/"+id, nil, &response); err != nil {
+		return WorkspaceResponse{}, err
+	}
+	return response, nil
+}
+
+func (client Client) ReplaceWorkspace(ctx context.Context, metadata Metadata, id string, workspace any) (WorkspaceResponse, error) {
+	var response WorkspaceResponse
+	if err := client.doJSON(ctx, metadata, http.MethodPut, WorkspacePath+"/"+id, workspace, &response); err != nil {
+		return WorkspaceResponse{}, err
 	}
 	return response, nil
 }

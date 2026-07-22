@@ -9,7 +9,7 @@ export const commandIds = {
     toggleRail: "workspace.toggleRail", addLane: "workspace.addLane", closeLane: "workspace.closeLane",
     cycleNext: "workspace.cycleNext", cyclePrevious: "workspace.cyclePrevious", nextRollout: "workspace.nextRollout", previousRollout: "workspace.previousRollout",
     promoteDemote: "workspace.promoteDemote", pinReference: "workspace.pinReference", directionRows: "workspace.directionRows", directionColumns: "workspace.directionColumns",
-    descend: "workspace.descend", ascend: "workspace.ascend", openDetail: "workspace.openDetail", jumpBack: "workspace.jumpBack", jumpForward: "workspace.jumpForward", resizeMode: "workspace.resizeMode", moveMode: "workspace.moveMode",
+    descend: "workspace.descend", ascend: "workspace.ascend", openDetail: "workspace.openDetail", toggleGuide: "workspace.toggleGuide", toggleSettings: "workspace.toggleSettings", jumpBack: "workspace.jumpBack", jumpForward: "workspace.jumpForward", resizeMode: "workspace.resizeMode", moveMode: "workspace.moveMode",
   },
   trajectory: {
     dismiss: "trajectory.dismiss", search: "trajectory.search", next: "trajectory.next", previous: "trajectory.previous",
@@ -70,6 +70,8 @@ export const commands: readonly CommandDefinition[] = [
   { id: commandIds.workspace.descend, scope: "workspace", label: "Descend active lane", defaultBindings: ["Enter", "Space"] },
   { id: commandIds.workspace.ascend, scope: "workspace", label: "Ascend active lane or restore arrangement", defaultBindings: ["Escape"] },
   { id: commandIds.workspace.openDetail, scope: "workspace", label: "Open rollout detail", defaultBindings: ["d"] },
+  { id: commandIds.workspace.toggleGuide, scope: "workspace", label: "Toggle guide", defaultBindings: ["?", "Shift+G"] },
+  { id: commandIds.workspace.toggleSettings, scope: "workspace", label: "Toggle settings", defaultBindings: ["Shift+S"] },
   { id: commandIds.workspace.jumpBack, scope: "workspace", label: "Previous workspace arrangement", defaultBindings: ["Ctrl+o"] },
   { id: commandIds.workspace.jumpForward, scope: "workspace", label: "Next workspace arrangement", defaultBindings: ["Ctrl+i"] },
   { id: commandIds.workspace.resizeMode, scope: "workspace", label: "Toggle seam resize mode", defaultBindings: ["Ctrl+w"] },
@@ -86,7 +88,7 @@ export const commands: readonly CommandDefinition[] = [
   // Kept as a stable legacy ID for imported keymaps; Source is now lane depth 4.
   { id: commandIds.trajectory.toggleRaw, scope: "trajectory", label: "Legacy raw event toggle", defaultBindings: [] },
   { id: commandIds.trajectory.openGroup, scope: "trajectory", label: "Compare trajectory group", defaultBindings: ["g"] },
-  { id: commandIds.trajectory.toggleHelp, scope: "overlay", label: "Toggle keyboard shortcuts", defaultBindings: ["?"] },
+  { id: commandIds.trajectory.toggleHelp, scope: "overlay", label: "Legacy keyboard shortcut overlay", defaultBindings: [] },
   { id: commandIds.trajectory.toggleExpanded, scope: "trajectory", label: "Expand selected event", defaultBindings: ["Enter", "Space"] },
   { id: commandIds.trajectory.openTranscript, scope: "trajectory", label: "Open transcript", defaultBindings: ["1"] },
   { id: commandIds.trajectory.openTimeline, scope: "trajectory", label: "Open event timeline", defaultBindings: ["2"] },
@@ -111,7 +113,7 @@ export const commands: readonly CommandDefinition[] = [
   { id: commandIds.view.zoomInAll, scope: "all", label: "Zoom in all lanes", defaultBindings: [">"] },
   { id: commandIds.view.zoomOutAll, scope: "all", label: "Zoom out all lanes", defaultBindings: ["<"] },
   { id: commandIds.view.zoomFitAll, scope: "all", label: "Fit axis in all lanes", defaultBindings: [")"] },
-  { id: commandIds.view.toggleHelp, scope: "all", label: "Show active keyboard shortcuts", defaultBindings: ["?"] },
+  { id: commandIds.view.toggleHelp, scope: "all", label: "Legacy keyboard shortcut overlay", defaultBindings: [] },
 
   { id: commandIds.group.back, scope: "group", label: "Back to trajectory", defaultBindings: ["Escape"], allowInInput: true },
   { id: commandIds.group.togglePaths, scope: "group", label: "Toggle behavioral paths", defaultBindings: ["p"] },
@@ -328,8 +330,7 @@ export function useKeymapRevision(): number {
   return revision;
 }
 
-/** Execute a command as if its first binding were pressed. Used by the keybar
- * so pointer users get exactly the keyboard behavior. */
+/** Execute a command as if its first binding were pressed. */
 export function dispatchCommand(id: CommandId): void {
   const binding = bindingsFor(id, loadKeymapOverrides())[0];
   if (!binding) return;

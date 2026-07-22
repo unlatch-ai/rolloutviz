@@ -19,6 +19,7 @@ import (
 
 	"github.com/TheSnakeFang/rlviz/internal/app"
 	"github.com/TheSnakeFang/rlviz/internal/daemon"
+	guidecontent "github.com/TheSnakeFang/rlviz/internal/guide"
 	"github.com/TheSnakeFang/rlviz/internal/plugins"
 	"github.com/TheSnakeFang/rlviz/internal/plugins/sourceprofile"
 )
@@ -62,7 +63,11 @@ type pluginInitResult struct {
 }
 
 func main() {
-	command := "help"
+	if len(os.Args) == 1 {
+		runOpen(nil)
+		return
+	}
+	command := "open"
 	if len(os.Args) > 1 {
 		command = os.Args[1]
 	}
@@ -88,6 +93,12 @@ func main() {
 		runDoctor(os.Args[2:])
 	case "formats":
 		runFormats(os.Args[2:])
+	case "guide":
+		runGuide(os.Args[2:])
+	case "trajectories":
+		runTrajectories(os.Args[2:])
+	case "workspace":
+		runWorkspace(os.Args[2:])
 	case "presentation":
 		runPresentation(os.Args[2:])
 	case "inspect":
@@ -117,17 +128,17 @@ func runOpen(arguments []string) {
 	flags := flag.NewFlagSet("open", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	noOpen := flags.Bool("no-open", false, "do not open the browser")
-	tuiMode := flags.Bool("tui", false, "open the terminal viewer")
+	legacyTUI := flags.Bool("tui", false, "deprecated: trajectories are displayed in the browser")
 	jsonOutput := flags.Bool("json", false, "print machine-readable output")
 	adapter := flags.String("adapter", "", "trusted adapter plugin path")
 	presentationPath := flags.String("presentation", "", "validated declarative presentation JSON")
 	flags.Usage = func() {
-		fmt.Fprintln(flags.Output(), "Usage: rlviz open [--no-open] [--tui] [--json] [--adapter PATH] [--presentation FILE] SOURCE")
+		fmt.Fprintln(flags.Output(), "Usage: rlviz open [--no-open] [--json] [--adapter PATH] [--presentation FILE] [SOURCE]")
 	}
 	if err := flags.Parse(normalizeViewerArguments(arguments)); err != nil {
 		os.Exit(2)
 	}
-	if flags.NArg() != 1 {
+	if flags.NArg() > 1 {
 		flags.Usage()
 		os.Exit(2)
 	}
@@ -141,37 +152,66 @@ func runOpen(arguments []string) {
 		fatalError("open", *jsonOutput, err)
 	}
 	if !configured {
-		fmt.Fprintln(os.Stderr, "Hint: run `rlviz init` to choose browser/TUI defaults and install optional agent skills.")
+		fmt.Fprintln(os.Stderr, "Hint: run `rlviz init` to configure the browser viewer and install optional agent instructions.")
 	}
-	if *tuiMode && *jsonOutput {
-		fatalError("open", true, errors.New("--tui cannot be combined with --json"))
+	if *legacyTUI {
+		fatalError("open", *jsonOutput, errors.New("the trajectory TUI was removed; use `rlviz trajectories SOURCE --json` to query and `rlviz workspace open SOURCE` to display results"))
 	}
-	mode := preferredOpenMode(config, configured, *tuiMode, *jsonOutput)
-	if mode == "tui" {
-		if err := runTUI(flags.Arg(0), *adapter); err != nil {
-			fatalError("open", false, err)
+	explicit := flags.NArg() == 1
+	if !explicit && (*adapter != "" || *presentationPath != "") {
+		fatalError("open", *jsonOutput, errors.New("--adapter and --presentation require an explicit SOURCE"))
+	}
+	source := ""
+	if explicit {
+		source = flags.Arg(0)
+	} else if usableSource(config.LastSource) {
+		source = config.LastSource
+	}
+	if source == "" {
+		paths, pathErr := daemon.DefaultPaths()
+		if pathErr != nil {
+			fatalError("open", *jsonOutput, pathErr)
 		}
+		gallery, galleryErr := ensureGallerySources(paths)
+		if galleryErr != nil {
+			fatalError("open", *jsonOutput, galleryErr)
+		}
+		openGalleryCommand(gallery, *noOpen, *jsonOutput, "open")
 		return
 	}
-	openSource(flags.Arg(0), *adapter, presentationConfig, *noOpen, *jsonOutput, "open")
-	if mode == "both" {
-		if err := runTUI(flags.Arg(0), *adapter); err != nil {
-			fatalError("open", false, err)
+	registeredPath := openSource(source, *adapter, presentationConfig, *noOpen, *jsonOutput, "open")
+	if *adapter == "" {
+		if err := rememberLastSource(config, configured, registeredPath); err != nil {
+			fatalError("open", *jsonOutput, err)
 		}
 	}
 }
 
-func preferredOpenMode(config userConfig, configured, tuiMode, jsonOutput bool) string {
-	if jsonOutput {
-		return "browser"
+func usableSource(path string) bool {
+	if path == "" {
+		return false
 	}
-	if tuiMode {
-		return "tui"
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func runGuide(arguments []string) {
+	flags := flag.NewFlagSet("guide", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	jsonOutput := flags.Bool("json", false, "print machine-readable output")
+	flags.Usage = func() { fmt.Fprintln(flags.Output(), "Usage: rlviz guide [--json]") }
+	if err := flags.Parse(arguments); err != nil {
+		os.Exit(2)
 	}
-	if configured {
-		return config.OpenMode
+	if flags.NArg() != 0 {
+		flags.Usage()
+		os.Exit(2)
 	}
-	return "browser"
+	if *jsonOutput {
+		writeOutput(map[string]any{"guide": guidecontent.Markdown, "web_url": "https://rlviz.dev/guide.html"}, true, "")
+		return
+	}
+	fmt.Print(guidecontent.Markdown)
 }
 
 func runServe(arguments []string) {
@@ -798,12 +838,15 @@ Inspect agent rollouts locally.
 Usage:
   rlviz init [--yes]
   rlviz demo [--no-open] [--json]
-  rlviz open [--no-open] [--json] [--adapter PATH] [--presentation FILE] SOURCE
+  rlviz open [--no-open] [--json] [--adapter PATH] [--presentation FILE] [SOURCE]
   rlviz serve [--open] [--port PORT] [--json] [--adapter PATH] [--presentation FILE] SOURCE
   rlviz status [--json]
   rlviz stop [--json]
   rlviz doctor [--json]
   rlviz formats [--json] [--project DIR] [--plugin-root DIR]...
+  rlviz guide [--json]
+  rlviz trajectories [--query TEXT] [--failed] [--errors] [--group-by rollout|trial] [--json] SOURCE
+  rlviz workspace <open|show|add|detail|group>
   rlviz presentation validate [--json] FILE
   rlviz inspect [--json] [--adapter PATH] SOURCE
   rlviz setup agent <codex|claude-code|cursor> (--print | --dry-run --destination PATH | --write --destination PATH) [--json]

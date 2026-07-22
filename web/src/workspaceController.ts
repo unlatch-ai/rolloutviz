@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import {
   emptyWorkspace,
@@ -9,8 +9,10 @@ import {
   workspaceStorageKey,
   workspaceTopologyKey,
   workspaceURL,
+  workspaceWithoutLayout,
 } from "./workspace";
 import type { WorkspaceState } from "./workspace";
+import { loadRemoteWorkspace, remoteWorkspaceID, saveRemoteWorkspace } from "./workspaceRemote";
 
 type WorkspaceAction = { type: "replace"; workspace: WorkspaceState };
 
@@ -53,6 +55,10 @@ export function useWorkspaceController(): WorkspaceController {
   const jumpIndex = useRef(0);
   const pendingReplace = useRef<WorkspaceState | undefined>(undefined);
   const replaceFrame = useRef<number | undefined>(undefined);
+  const remoteID = useMemo(() => remoteWorkspaceID(), []);
+  const remoteRevision = useRef(-1);
+  const remoteSerialized = useRef("");
+  const [remoteReady, setRemoteReady] = useState(!remoteID);
 
   const writeURL = useCallback((next: WorkspaceState, push: boolean) => {
     try { localStorage.setItem(workspaceStorageKey, JSON.stringify(next)); } catch { /* persistence is optional */ }
@@ -131,6 +137,47 @@ export function useWorkspaceController(): WorkspaceController {
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  useEffect(() => {
+    if (!remoteID) return;
+    const controller = new AbortController();
+    const follow = async () => {
+      while (!controller.signal.aborted) {
+        try {
+          const remote = await loadRemoteWorkspace(remoteID, remoteRevision.current, controller.signal);
+          remoteRevision.current = remote.revision;
+          remoteSerialized.current = JSON.stringify(workspaceWithoutLayout(remote.workspace));
+          restoring.current = true;
+          applyWorkspace(remote.workspace, false);
+          restoring.current = false;
+          setRemoteReady(true);
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          setRemoteReady(true);
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        }
+      }
+    };
+    void follow();
+    return () => controller.abort();
+  }, [applyWorkspace, remoteID]);
+
+  useEffect(() => {
+    if (!remoteID || !remoteReady) return;
+    const serialized = JSON.stringify(workspaceWithoutLayout(workspace));
+    if (serialized === remoteSerialized.current) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void saveRemoteWorkspace(remoteID, workspace, controller.signal).then((remote) => {
+        remoteRevision.current = remote.revision;
+        remoteSerialized.current = JSON.stringify(workspaceWithoutLayout(remote.workspace));
+      }).catch(() => undefined);
+    }, 80);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [remoteID, remoteReady, workspace]);
 
   return {
     workspace,

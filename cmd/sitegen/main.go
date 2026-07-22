@@ -20,12 +20,14 @@ type page struct {
 }
 
 var pages = []page{
-	{Title: "Docs", Description: "Install RLViz, open a trace, and understand the product boundary.", Source: "site/index.md", Output: "docs.html"},
-	{Title: "Quickstart", Description: "Install RLViz and open a browser, terminal, or private-format trace.", Source: "docs/onboarding.md", Output: "onboarding.html"},
-	{Title: "Formats", Description: "Formats RLViz opens directly and the boundary for local adapters.", Source: "docs/supported-formats.md", Output: "supported-formats.html"},
+	{Title: "Docs", Description: "What RLViz does, its local-first boundary, and when to use it.", Source: "internal/guide/pages/overview.md", Output: "docs.html"},
+	{Title: "Install", Description: "Open RLViz in the browser or install and set up the local CLI.", Source: "internal/guide/pages/install.md", Output: "onboarding.html"},
+	{Title: "Workspace", Description: "Use collections, rollout lanes, detail modules, timelines, and keyboard controls.", Source: "internal/guide/pages/workspace.md", Output: "guide.html"},
+	{Title: "Formats", Description: "Built-in formats and the browser and local adapter boundaries.", Source: "internal/guide/pages/formats.md", Output: "supported-formats.html"},
+	{Title: "Agents", Description: "Query trajectories and control a named GUI workspace from a coding agent.", Source: "internal/guide/pages/agents.md", Output: "agents.html"},
 	{Title: "Adapter authoring", Description: "Safe workflow for building, trusting, validating, and using source adapters.", Source: "docs/adapter-authoring.md", Output: "adapter-authoring.html"},
 	{Title: "Canonical model", Description: "Canonical records emitted by built-in and user-authored adapters.", Source: "docs/data-model.md", Output: "data-model.html"},
-	{Title: "FAQ", Description: "Privacy, source handling, scale, formats, and product boundaries.", Source: "docs/faq.md", Output: "faq.html"},
+	{Title: "Privacy", Description: "Privacy, source handling, local storage, scale, and surface selection.", Source: "internal/guide/pages/privacy.md", Output: "faq.html"},
 }
 
 const siteURL = "https://rlviz.dev"
@@ -111,7 +113,7 @@ func rawURL(current page) string {
 func llmsManifest() string {
 	var output strings.Builder
 	output.WriteString("# RLViz documentation\n\n")
-	output.WriteString("> Local-first rollout viewer documentation in raw Markdown.\n\n")
+	output.WriteString("> Local-first rollout viewer documentation in raw Markdown. Agents should start with Install, Formats, and Agents before opening or adapting a trace.\n\n")
 	for _, current := range pages {
 		fmt.Fprintf(&output, "- [%s](%s): %s\n", current.Title, rawURL(current), current.Description)
 	}

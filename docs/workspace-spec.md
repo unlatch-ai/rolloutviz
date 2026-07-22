@@ -42,8 +42,8 @@ MIT, with floating panels and popout windows disabled):
   (`Alt+←↑↓→`) moves focus to the neighboring module. `Ctrl+m` enters a
   move-module mode where the same arrows relocate the active module; `Ctrl+w`
   enters seam-resize mode. The entry chord toggles its mode off and `Esc`
-  exits either mode. While a mode is active, the keybar shows only its live
-  arrow, toggle, and cancel controls.
+  exits either mode. While a mode is active, Guide shows only its live arrow,
+  toggle, and cancel controls.
 
 ## 2. The collection module
 
@@ -96,21 +96,23 @@ the source trace or become part of a shared workspace URL.
   landmark keys operate on that rollout even after another module becomes
   active; closing the pinned detail does not close the rollout lane.
 
-## 4. Keys: one bar, always accurate
+## 4. Keys: one source, active-module scope
 
-A single keybar at the bottom of the screen renders the **active module's
-actual bindings** from the command registry (top ~8 by relevance, `?` for
-all). Per-module footers are removed. Every binding shown is live; every
-live binding is discoverable through `?`. Clicking a keybar chip executes
-its command. Dock content cannot shrink, cover, or scroll this bar away.
+The docked Guide renders the **active module's actual bindings** from the
+command registry. `?` opens or closes Guide and restores the module that
+invoked it. The fixed bottom bar is removed so it cannot cover content or
+consume viewport height. Every live binding remains discoverable in Guide.
 
 ## 5. Settings, onboarding, and agents
 
-- All preferences are **data** in one config file (Tier C): keymap remaps,
-  palette, default fidelity, layout/docking arrangement, per-trace-type
-  presets (glyph bindings, landmark definitions, episode anchors).
-- **First-run onboarding**: an in-app setup flow (and `rlviz init` in the
-  CLI) that walks layout, theme, and keymap choices and writes the config.
+- Settings is a docked, default-open module. It owns theme, browser data
+  opening, and format/adapter guidance; `Shift+S` toggles it and restores the
+  module that invoked it.
+- Keymap remaps, palette, default fidelity, and per-trace-type presentation
+  presets remain validated Tier-C data. A complete remapping UI is separate
+  work, not implied by the current Settings module.
+- `rlviz init` configures the local browser workflow and optional agent
+  instructions.
 - The config file's location and schema are documented so **the user's
   coding agent can adjust it** — trace-type-specific setup (private event
   kinds, custom glyphs, episode anchor rules) is expected to be done by

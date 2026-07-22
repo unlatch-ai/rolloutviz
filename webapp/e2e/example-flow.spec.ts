@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-test("bundled example stays local and walks Browse to Read", async ({ page }) => {
+test("bundled sample opens automatically, keeps guide state, and walks Browse to Read", async ({ page }) => {
   const requests: Array<{ url: string; method: string; body: string | null }> = [];
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
   const contentTypes: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".wasm": "application/wasm" };
@@ -21,15 +21,24 @@ test("bundled example stays local and walks Browse to Read", async ({ page }) =>
   });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Inspect agent rollouts locally." })).toBeVisible();
-  await expect(page.getByText("zero upload", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "300-event coding trace" }).click();
-
   await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("option").first()).toContainText("coding-bugfix-rollout-01");
+  await expect(page.getByRole("main", { name: "Browse trajectories" }).getByRole("option").first()).toContainText("checkout-rollout-01");
+  await expect(page.getByRole("article", { name: "RLViz guide" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Install" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("region", { name: "RLViz settings" })).toBeVisible();
+  await page.getByRole("article", { name: "RLViz guide" }).getByRole("button", { name: "close" }).click();
+  await page.getByRole("region", { name: "RLViz settings" }).getByRole("button", { name: "close" }).click();
+  await expect(page.getByRole("article", { name: "RLViz guide" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("article", { name: "RLViz guide" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "RLViz settings" })).toHaveCount(0);
+  await page.keyboard.press("?");
+  await expect(page.getByRole("article", { name: "RLViz guide" })).toBeVisible();
+  await page.keyboard.press("?");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main", { name: "Read trajectory" })).toBeVisible();
-  await expect(page.locator(".selection-address")).toContainText("#");
+  await expect(page.locator(".workspace-console .moment.selected .address")).not.toBeEmpty();
 
   expect(requests.some((request) => new URL(request.url).origin !== "http://127.0.0.1:4174")).toBe(false);
   expect(requests.some((request) => request.method !== "GET")).toBe(false);
@@ -49,7 +58,6 @@ test("checkout browse shape keeps the known error in its true slot", async ({ pa
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "checkout cohort" }).click();
   await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible({ timeout: 15_000 });
   const rollout = page.getByRole("option").filter({ hasText: "checkout-rollout-06" });
   const error = rollout.locator(".cat-glyphs > .g-error");

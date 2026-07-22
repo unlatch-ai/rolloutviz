@@ -85,6 +85,10 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto("http://127.0.0.1:4173/", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible();
+  const guide = page.getByRole("article", { name: "RLViz guide" });
+  if (await guide.count()) await guide.getByRole("button", { name: "close" }).click();
+  const settings = page.getByRole("region", { name: "RLViz settings" });
+  if (await settings.count()) await settings.getByRole("button", { name: "close" }).click();
 });
 
 function target(page: Page, observable: Observable): Locator {
@@ -136,8 +140,13 @@ async function act(page: Page, action: FlowAction, boxes: Map<string, Awaited<Re
   if (action.kind === "reload") { await page.reload({ waitUntil: "domcontentloaded" }); await expect(page.locator(".workspace-rack")).toBeVisible(); return; }
   if (action.kind === "history-back") { await page.goBack(); return; }
   const shape = page.locator(`[data-event-index="${action.eventIndex}"]`);
-  await shape.hover();
-  return shape.click();
+  const shapeBox = await shape.boundingBox();
+  const svg = shape.locator("xpath=..");
+  const svgBox = await svg.boundingBox();
+  if (!shapeBox || !svgBox) throw new Error(`missing event shape ${action.eventIndex}`);
+  const position = { x: shapeBox.x + shapeBox.width / 2 - svgBox.x, y: shapeBox.y + shapeBox.height / 2 - svgBox.y };
+  await svg.hover({ position });
+  return svg.click({ position });
 }
 
 async function observe(page: Page, observable: Observable, boxes: Map<string, Awaited<ReturnType<Locator["boundingBox"]>>>, attributes: Map<string, string | null>) {
@@ -151,7 +160,13 @@ async function observe(page: Page, observable: Observable, boxes: Map<string, Aw
   if (!observable.attribute && observable.equals !== undefined) await expect(locator).toHaveText(observable.equals);
   if (!observable.attribute && observable.contains !== undefined) await expect(locator.first()).toContainText(observable.contains);
   if (observable.value !== undefined) await expect(locator.first()).toHaveValue(observable.value);
-  if (observable.boxEquals) expect(await locator.first().boundingBox()).toEqual(boxes.get(observable.boxEquals));
+  if (observable.boxEquals) {
+    const actual = await locator.first().boundingBox(), expected = boxes.get(observable.boxEquals);
+    expect(actual).not.toBeNull(); expect(expected).not.toBeNull();
+    // Dockview rounds serialized fractional CSS pixels on restore. Geometry
+    // persistence is exact to the rendered pixel, not the subpixel float.
+    for (const key of ["x", "y", "width", "height"] as const) expect(Math.abs(actual![key] - expected![key])).toBeLessThanOrEqual(1);
+  }
   if (observable.boxNotEquals) expect(await locator.first().boundingBox()).not.toEqual(boxes.get(observable.boxNotEquals));
   if (observable.boxBelow) {
     const actual = await locator.first().boundingBox(), reference = boxes.get(observable.boxBelow);

@@ -175,7 +175,7 @@ export const flows: Flow[] = [
       // contract covers keyboard resize (real input) and persistence.
       { action: { kind: "key", value: "Enter" }, expect: [{ target: "focus-lane", count: 1 }] },
       { action: { kind: "capture-box", target: ".workspace-console", key: "console-before" }, expect: [{ target: "console" }] },
-      { action: { kind: "key", value: "Control+w" }, expect: [attr("console", "data-resize-mode", "true"), { target: "rail", selector: ".keybar", contains: "Exit resize mode" }] },
+      { action: { kind: "key", value: "Control+w" }, expect: [attr("console", "data-resize-mode", "true")] },
       { action: { kind: "key", value: "ArrowLeft" }, expect: [{ target: "console" }] },
       { action: { kind: "key", value: "ArrowLeft" }, expect: [{ target: "console", boxNotEquals: "console-before" }] },
       { action: { kind: "key", value: "Control+w" }, expect: [attr("console", "data-resize-mode", "false")] },
@@ -340,11 +340,13 @@ export const flows: Flow[] = [
     ],
   },
   {
-    id: "s", name: "global-keybar-switches-and-clicks-live-binding", keyboardOnly: false, surfaces: ["daemon"], steps: [
-      { action: { kind: "key", value: "k" }, expect: [selectedRow("candidate"), { target: "rail", selector: ".keybar" }, { target: "rail", selector: ".keybar-chip:first-child kbd", contains: "Enter" }] },
-      { action: { kind: "click", target: ".keybar-chip:first-child" }, expect: [...depth(1), { target: "rail", selector: ".keybar-chip:first-child kbd", equals: "j" }, selectedEvent("Policy error")] },
-      { action: { kind: "click", target: ".keybar-chip:first-child" }, expect: [selectedEvent("Final reward")] },
-      { action: { kind: "key", value: "k" }, expect: [selectedEvent("Policy error")] },
+    id: "s", name: "guide-shortcuts-switch-with-active-module", keyboardOnly: true, surfaces: ["daemon"], steps: [
+      { action: { kind: "key", value: "k" }, expect: [selectedRow("candidate")] },
+      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".guide-shortcuts", contains: "Increase fidelity" }] },
+      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".workspace-guide", absent: true }] },
+      { action: { kind: "key", value: "Enter" }, expect: [...depth(1), selectedEvent("Policy error")] },
+      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".guide-shortcuts", contains: "Next event" }] },
+      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".workspace-guide", absent: true }] },
       { action: { kind: "key", value: "j" }, expect: [selectedEvent("Final reward")] },
     ],
   },
@@ -359,7 +361,7 @@ export const flows: Flow[] = [
     id: "u", name: "keyboard-module-move-persists", keyboardOnly: true, surfaces: ["daemon", "webapp"], steps: [
       { action: { kind: "key", value: "Enter" }, expect: [{ target: "focus-lane", count: 1 }] },
       { action: { kind: "key", value: "Tab" }, expect: [attr("shell", "data-active-zone", "detail"), attr("console", "data-dock-position", "right")] },
-      { action: { kind: "key", value: "Control+m" }, expect: [attr("shell", "data-move-mode", "true"), { target: "rail", selector: ".keybar", contains: "Exit move mode" }] },
+      { action: { kind: "key", value: "Control+m" }, expect: [attr("shell", "data-move-mode", "true")] },
       { action: { kind: "key", value: "ArrowDown" }, expect: [attr("console", "data-dock-position", "bottom")] },
       { action: { kind: "key", value: "Control+m" }, expect: [attr("shell", "data-move-mode", "false"), attr("console", "data-dock-position", "bottom")] },
       { action: { kind: "reload" }, expect: [attr("console", "data-dock-position", "bottom"), { target: "focus-lane", count: 1 }] },
@@ -369,7 +371,7 @@ export const flows: Flow[] = [
     webappSteps: [
       { action: { kind: "key", value: "Enter" }, expect: [{ target: "focus-lane", count: 1 }] },
       { action: { kind: "key", value: "Tab" }, expect: [attr("shell", "data-active-zone", "detail"), attr("console", "data-dock-position", "right")] },
-      { action: { kind: "key", value: "Control+m" }, expect: [attr("shell", "data-move-mode", "true"), { target: "rail", selector: ".keybar", contains: "Exit move mode" }] },
+      { action: { kind: "key", value: "Control+m" }, expect: [attr("shell", "data-move-mode", "true")] },
       { action: { kind: "key", value: "ArrowDown" }, expect: [attr("console", "data-dock-position", "bottom")] },
       { action: { kind: "key", value: "Control+m" }, expect: [attr("shell", "data-move-mode", "false"), attr("console", "data-dock-position", "bottom")] },
     ],
@@ -377,7 +379,7 @@ export const flows: Flow[] = [
   {
     id: "v", name: "empty-dock-group-collapses", keyboardOnly: true, surfaces: ["daemon", "webapp"], steps: [
       { action: { kind: "key", value: "Enter" }, expect: [{ target: "focus-lane", count: 1 }] },
-      { action: { kind: "key", value: "x" }, expect: [{ target: "focus-lane", count: 0 }, { target: "console", selector: ".detail-empty", contains: "Open a rollout" }, { target: "stage", selector: ".dv-groupview:has(.lane-track)", absent: true }] },
+      { action: { kind: "key", value: "x" }, expect: [{ target: "focus-lane", count: 0 }, { target: "console", selector: ".detail-empty", absent: true }, { target: "stage", selector: ".dv-groupview:has(.lane-track)", absent: true }] },
     ],
   },
   {
@@ -438,10 +440,10 @@ export const flows: Flow[] = [
     ],
   },
   {
-    id: "z", name: "timeline-and-keybar-fit-desktop-and-compact-viewports", keyboardOnly: false, surfaces: ["daemon", "webapp"], steps: [
+    id: "z", name: "timeline-fits-desktop-and-compact-viewports", keyboardOnly: false, surfaces: ["daemon", "webapp"], steps: [
       { action: { kind: "key", value: "Enter" }, expect: [{ target: "read" }] },
-      { action: { kind: "viewport", width: 1440, height: 900 }, expect: [{ target: "read", selector: ".lane-track.active-zone .axis-navigator", withinViewport: true }, { target: "rail", selector: ".keybar", withinViewport: true }, { target: "shell", pageFitsViewport: true }] },
-      { action: { kind: "viewport", width: 1024, height: 700 }, expect: [{ target: "read", selector: ".lane-track.active-zone .axis-navigator", withinViewport: true }, { target: "rail", selector: ".keybar", withinViewport: true }, { target: "shell", pageFitsViewport: true }] },
+      { action: { kind: "viewport", width: 1440, height: 900 }, expect: [{ target: "read", selector: ".lane-track.active-zone .axis-navigator", withinViewport: true }, { target: "shell", pageFitsViewport: true }] },
+      { action: { kind: "viewport", width: 1024, height: 700 }, expect: [{ target: "read", selector: ".lane-track.active-zone .axis-navigator", withinViewport: true }, { target: "shell", pageFitsViewport: true }] },
     ],
   },
 ];

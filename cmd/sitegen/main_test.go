@@ -42,8 +42,8 @@ func TestBuildWritesEveryPageAndStylesheet(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{
-		"docs.html", "docs.md", "onboarding.html", "onboarding.md", "supported-formats.html", "supported-formats.md",
-		"adapter-authoring.html", "adapter-authoring.md", "data-model.html", "data-model.md", "faq.html", "faq.md",
+		"docs.html", "docs.md", "guide.html", "guide.md", "onboarding.html", "onboarding.md", "supported-formats.html", "supported-formats.md",
+		"agents.html", "agents.md", "adapter-authoring.html", "adapter-authoring.md", "data-model.html", "data-model.md", "faq.html", "faq.md",
 		"llms.txt", "llms-full.txt", "CNAME", "favicon.svg", "rlviz-social.png", "style.css",
 	} {
 		content, err := os.ReadFile(filepath.Join(output, name))

@@ -5,8 +5,9 @@ native CLI for larger and private datasets.
 
 ## Browser
 
-Open [rlviz.dev](https://rlviz.dev), choose a trace, or drop it onto the page.
-The file is parsed and indexed in that tab. It is not uploaded or persisted.
+Open [rlviz.dev](https://rlviz.dev). The viewer starts with a bundled synthetic
+checkout cohort and an in-workspace Guide module. Open or drop a local trace
+when you are ready; the file is parsed in that tab and is not uploaded.
 
 The browser accepts files up to 32 MiB in these formats:
 
@@ -14,8 +15,9 @@ The browser accepts files up to 32 MiB in these formats:
 - Inspect AI EvalLog JSON
 - Verifiers GenerateOutputs JSON
 
-Three synthetic examples are available on the landing page. Use one to learn
-the viewer without exposing a real trace.
+Settings can reload any bundled example, open your own file, change theme, or
+load a reviewed browser adapter. The Guide opens to installation instructions
+in the hosted viewer.
 
 ## CLI
 
@@ -43,6 +45,10 @@ rlviz doctor
 availability, trusted adapters, and actionable problems. It does not open a
 trace or execute a plugin.
 
+Run `rlviz` with no arguments to restore the last usable source and workspace.
+If there is no history, RLViz opens its bundled synthetic gallery. The same
+fallback applies to `rlviz open`.
+
 ## Open a trace
 
 Probe an unfamiliar source before starting the viewer:
@@ -61,17 +67,14 @@ RLViz starts or reuses a loopback-only daemon, builds a removable local SQLite
 index, opens the browser, and returns immediately. It watches active files and
 adds appended events without changing the source.
 
-Use the terminal interface over SSH or when a browser is unavailable:
-
-```bash
-rlviz open --tui ./path/to/rollout.ndjson
-```
-
 Every operational command has structured output for scripts and coding agents:
 
 ```bash
 rlviz inspect --json ./path/to/rollout.ndjson
 rlviz status --json
+rlviz guide --json
+rlviz trajectories ./path/to/rollout.ndjson --failed --group-by trial --json
+rlviz workspace open ./path/to/rollout.ndjson --trajectory ID --json
 ```
 
 ## Learn with synthetic data
@@ -112,8 +115,8 @@ IDs, provenance, and browser adapters.
 
 ## Optional setup
 
-`rlviz init` chooses the default browser or terminal interface and can preview
-version-matched instructions for Codex, Claude Code, or Cursor. Every file is
+`rlviz init` configures the browser viewer and can preview version-matched
+instructions for Codex, Claude Code, or Cursor. Every file is
 shown before an explicit write confirmation. Existing files are never replaced.
 
 The lower-level commands are useful in automated environments:

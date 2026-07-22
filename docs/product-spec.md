@@ -129,6 +129,10 @@ Expected behavior:
 5. Return immediately so coding-agent shell calls do not hang.
 6. Watch active source files and stream appended events into the UI.
 
+With no explicit source, `rlviz` and `rlviz open` restore the last usable local
+source. With no usable history they open bundled synthetic data. The browser
+root also enters the shared viewer directly with a bundled synthetic cohort.
+
 ### Open an unsupported trajectory
 
 The CLI returns a machine-readable diagnostic and scaffold command:
@@ -162,7 +166,7 @@ The viewer must support:
 - collapsed rendering for large model and tool payloads
 - adjustable overview fidelity and semantic depth
 - a draggable and resizable full-rollout timeline viewport
-- an always-visible keybar for the active module
+- active-module shortcut reference in the docked Guide
 - distinct visual treatment for actions, observations, errors, rewards, and grader output
 - raw JSON inspection for every normalized event
 - source file and byte/line location

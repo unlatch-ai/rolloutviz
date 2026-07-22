@@ -16,7 +16,7 @@ coding agent or human
         |
         v
 rlviz CLI --------------------------------------------------+
-  open / status / stop / doctor / cache / plugin            |
+  open / trajectories / workspace / setup / plugin          |
         |                                                    |
         v                                                    |
 background daemon on 127.0.0.1                              |
@@ -28,14 +28,15 @@ background daemon on 127.0.0.1                              |
         |                                                    |
         v                                                    |
 browser viewer                                                |
-  trajectory / group / compact paths / pair comparison       |
+  collection / rollout / detail / guide / settings modules   |
   event details / artifacts / analyzer findings              |
                                                              |
 source files <---------- always read-only -------------------+
 ```
 
 The binary contains no model and does not execute recorded tools. Coding agents
-operate the CLI and can author project-local adapters; RLViz remains the viewer.
+use structured CLI queries and named-workspace commands, and can author
+project-local adapters; the browser remains the only trajectory renderer.
 
 ## Repository map
 
@@ -69,8 +70,9 @@ operate the CLI and can author project-local adapters; RLViz remains the viewer.
 
 `rlviz.dev` serves the browser viewer and generated external documentation from
 one static deployment. The former `app.rlviz.dev` surface redirects to the same
-path on `rlviz.dev`. The landing page reads a dropped or selected `File` into
-the current tab. A Go WASM core detects canonical NDJSON, Inspect AI EvalLog
+path on `rlviz.dev`. The root loads a bundled synthetic cohort into the viewer;
+Settings can replace it with a dropped or selected `File` in the current tab.
+A Go WASM core detects canonical NDJSON, Inspect AI EvalLog
 JSON, or Verifiers GenerateOutputs JSON, validates canonical records, and
 builds an in-memory collection. The shared React instrument consumes a
 `ViewerProvider`; the CLI uses the daemon HTTP provider and the static app uses
@@ -84,16 +86,17 @@ SHA-256 and size confirmation and are never persisted.
 ### Open a source
 
 ```text
-rlviz open SOURCE
-  1. validate and normalize an explicit presentation file, if supplied
-  2. resolve the source path without modifying it
-  3. load or start the per-user daemon
-  4. send an authenticated registration request
-  5. independently validate presentation input and choose the decoder
-  6. validate and commit the first bounded record batch
-  7. store normalized presentation separately from source content
-  8. return an authenticated viewer URL and continue watching
-  9. open the browser and let the CLI exit promptly
+rlviz open [SOURCE]
+  1. use SOURCE when supplied; otherwise restore the last usable source or materialize the bundled gallery
+  2. validate and normalize an explicit presentation file, if supplied
+  3. resolve the source path without modifying it
+  4. load or start the per-user daemon
+  5. send an authenticated registration request
+  6. independently validate presentation input and choose the decoder
+  7. validate and commit the first bounded record batch
+  8. store normalized presentation separately from source content
+  9. return an authenticated viewer URL and continue watching
+  10. open the browser and let the CLI exit promptly
 ```
 
 The daemon records `indexing`, `complete`, `refreshing`, or `failed`. An initial

@@ -28,6 +28,10 @@ The raw ordered event stream always remains available.
 
 ## Application frame
 
+The workspace can also dock a concise Guide module. It is open on a fresh
+workspace, can be toggled with `Shift+G`, and uses the same source as the CLI
+and public guide. A blank Detail module is not shown before a rollout exists.
+
 ```text
 +-----------------------------------------------------------------------+
 | run / case / rollout                         outcome   reward   command |

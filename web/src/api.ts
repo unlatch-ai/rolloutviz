@@ -12,7 +12,7 @@ export function trajectoryEndpoint(search = globalThis.location?.search ?? ""): 
   const indexed = params.get("indexed") === "1";
   params.delete("indexed");
   // Viewer state belongs in shareable URLs, but is not part of the daemon API.
-  for (const key of ["demo", "event", "surface", "view", "mode", "left", "right", "step", "cohort_filter", "workspace"]) params.delete(key);
+  for (const key of ["demo", "event", "surface", "view", "mode", "left", "right", "step", "cohort_filter", "workspace", "workspace_id"]) params.delete(key);
   if (indexed && !params.has("limit")) params.set("limit", "200");
   const query = params.toString();
   return `${indexed ? "/api/v1/indexed/trajectory" : "/api/v1/trajectory"}${query ? `?${query}` : ""}`;

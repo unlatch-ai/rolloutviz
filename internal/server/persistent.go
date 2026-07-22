@@ -17,6 +17,10 @@ type PersistentRegistrar func(context.Context, string, string, json.RawMessage) 
 func NewPersistentHandler(reader IndexedReader, token string, registrar PersistentRegistrar, stop func()) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/api/v1/indexed/", NewIndexedHandler(reader, token))
+	workspaceStore := NewWorkspaceStore()
+	mux.Handle("/api/v1/workspaces", workspaceHandler(workspaceStore, token))
+	// The trailing-slash route serves individual named workspaces.
+	mux.Handle("/api/v1/workspaces/", workspaceHandler(workspaceStore, token))
 	mux.HandleFunc("GET /api/v1/health", func(response http.ResponseWriter, _ *http.Request) {
 		response.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(response, `{"status":"ok"}`+"\n")

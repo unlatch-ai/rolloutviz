@@ -277,14 +277,16 @@ func checkoutCohort() ([]byte, error) {
 	for rollout := range 16 {
 		trajectoryID := fmt.Sprintf("checkout-rollout-%02d", rollout+1)
 		parent := ""
+		passed := rollout != 5 && rollout != 9
+		toolByStage := map[string]string{"setup": "inspect_checkout", "cart": "read_cart", "address": "update_shipping_address", "payment": "select_saved_payment", "submit": "submit_order", "verify": "read_order_confirmation"}
 		for index := 0; index < lengths[rollout]; index++ {
 			stage := []string{"setup", "cart", "address", "payment", "submit", "verify"}[min(5, index*6/lengths[rollout])]
 			kind := []string{"generation", "tool", "observation"}[index%3]
 			input, output, data := any(nil), any(nil), any(nil)
 			title := fmt.Sprintf("%s · step %02d", stage, index)
 			if kind == "tool" {
-				input = map[string]any{"name": "browser_action", "arguments": map[string]any{"action": stage, "selector": fmt.Sprintf("[data-test=%s]", stage)}}
-				output = map[string]any{"ok": true, "url": "https://shop.example.test/checkout"}
+				input = map[string]any{"name": toolByStage[stage], "arguments": map[string]any{"checkout_id": fmt.Sprintf("synthetic-%02d", rollout+1), "stage": stage}}
+				output = map[string]any{"ok": true, "stage": stage, "revision": index / 3}
 			} else if kind == "generation" {
 				output = map[string]any{"role": "assistant", "content": fmt.Sprintf("Proceed through %s using the saved-card flow and verify visible state.", stage)}
 			} else {
@@ -306,11 +308,15 @@ func checkoutCohort() ([]byte, error) {
 				kind, title = "observation", "Recovered after retries; confirmation visible"
 				data = map[string]any{"order_id": "SYNTHETIC-1042", "confirmation_visible": true, "recovered": true}
 			}
+			if index == lengths[rollout]-1 {
+				kind, title = "grader", "Checkout task grader"
+				input, data = nil, nil
+				output = map[string]any{"verdict": map[bool]string{true: "pass", false: "fail"}[passed], "score": map[bool]float64{true: 1, false: 0}[passed], "checks": map[string]any{"order_created": passed, "source_unchanged": true, "confirmation_visible": passed}}
+			}
 			id := fmt.Sprintf("checkout-%02d-event-%03d", rollout+1, index)
 			s.add(&model.Event{RecordType: model.RecordEvent, ID: id, TrajectoryID: trajectoryID, Sequence: int64(index * 10), Kind: kind, ParentID: parent, AlignmentKey: "stage:" + stage, Input: input, Output: output, Data: data, Source: &model.SourceLocation{Path: "synthetic/checkout/cohort.ndjson"}, Metadata: model.Metadata{"title": title, "synthetic": true}})
 			parent = id
 		}
-		passed := rollout != 5 && rollout != 9
 		reward := 0.84 + float64((rollout*17+int(Seed%13))%15)/100
 		if !passed {
 			reward = -0.4

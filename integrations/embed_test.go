@@ -23,7 +23,7 @@ func TestAgentInstructionsPreserveReviewBeforeTrustWorkflow(t *testing.T) {
 			if init < 0 || edit < init || approval < edit || trust < approval {
 				t.Fatalf("unsafe workflow ordering in %s instructions: init=%d edit=%d approval=%d trust=%d", name, init, edit, approval, trust)
 			}
-			for _, required := range []string{"--from \"<source>\"", "plugin validate --json", "open --json"} {
+			for _, required := range []string{"--from \"<source>\"", "plugin validate --json", "open --json", "guide --json", "trajectories \"<source>\" --json", "workspace open"} {
 				if !strings.Contains(content, required) {
 					t.Fatalf("%s instructions missing %q", name, required)
 				}

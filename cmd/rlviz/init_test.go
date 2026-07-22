@@ -13,7 +13,7 @@ func TestInitWizardInteractiveWritesPreferenceAndConfirmedSkill(t *testing.T) {
 	t.Chdir(root)
 	home := filepath.Join(root, "home")
 	configDir := filepath.Join(root, "config")
-	input := strings.NewReader("tui\ncodex,cursor\ny\nn\nn\n")
+	input := strings.NewReader("codex,cursor\ny\nn\nn\n")
 	var output bytes.Buffer
 	result, err := runInitWizard(input, &output, initOptions{Interactive: true, HomeDir: home, ConfigDir: configDir})
 	if err != nil {
@@ -23,7 +23,7 @@ func TestInitWizardInteractiveWritesPreferenceAndConfirmedSkill(t *testing.T) {
 		t.Fatal("gallery opened after no confirmation")
 	}
 	config, err := os.ReadFile(filepath.Join(configDir, "config.json"))
-	if err != nil || !strings.Contains(string(config), `"open_mode": "tui"`) {
+	if err != nil || !strings.Contains(string(config), `"open_mode": "browser"`) {
 		t.Fatalf("config = %q, %v", config, err)
 	}
 	skillPath := filepath.Join(home, ".codex", "skills", "rlviz", "SKILL.md")
@@ -94,23 +94,36 @@ func TestLoadUserConfigUsesOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	config, exists, err := loadUserConfig()
-	if err != nil || !exists || config.OpenMode != "both" {
+	if err != nil || !exists || config.OpenMode != "browser" {
 		t.Fatalf("config = %#v, exists=%v, err=%v", config, exists, err)
 	}
 }
 
-func TestPreferredOpenModeHonorsConfigAndExplicitAutomation(t *testing.T) {
+func TestRememberLastSourcePreservesInterfacePreference(t *testing.T) {
+	configDir := t.TempDir()
+	t.Setenv("RLVIZ_CONFIG_DIR", configDir)
+	source := filepath.Join(t.TempDir(), "trace.ndjson")
+	if err := os.WriteFile(source, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	config := userConfig{SchemaVersion: 1, OpenMode: "both"}
-	if got := preferredOpenMode(config, true, false, false); got != "both" {
-		t.Fatalf("configured mode = %q", got)
+	if err := rememberLastSource(config, true, source); err != nil {
+		t.Fatal(err)
 	}
-	if got := preferredOpenMode(config, true, true, false); got != "tui" {
-		t.Fatalf("explicit TUI mode = %q", got)
+	loaded, exists, err := loadUserConfig()
+	if err != nil || !exists {
+		t.Fatalf("load config: exists=%v err=%v", exists, err)
 	}
-	if got := preferredOpenMode(config, true, false, true); got != "browser" {
-		t.Fatalf("JSON automation mode = %q", got)
+	if loaded.OpenMode != "browser" || loaded.LastSource != source {
+		t.Fatalf("config = %#v", loaded)
 	}
-	if got := preferredOpenMode(userConfig{}, false, false, false); got != "browser" {
-		t.Fatalf("unconfigured mode = %q", got)
+	if !usableSource(loaded.LastSource) {
+		t.Fatal("remembered source should be usable")
+	}
+	if err := os.Remove(source); err != nil {
+		t.Fatal(err)
+	}
+	if usableSource(loaded.LastSource) {
+		t.Fatal("removed source should fall back to samples")
 	}
 }

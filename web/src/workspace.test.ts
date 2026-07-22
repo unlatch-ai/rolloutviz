@@ -2,6 +2,16 @@ import { describe, expect, it } from "vitest";
 import { effectiveDepth, emptyWorkspace, laneId, legacyWorkspace, normalizeWorkspace, serializeWorkspace, workspaceFromSearch, workspaceURL } from "./workspace";
 
 describe("workspace arrangements", () => {
+  it("opens the guide by default and migrates older workspaces into the guide", () => {
+    expect(emptyWorkspace().guideOpen).toBe(true);
+    const older = emptyWorkspace() as Partial<ReturnType<typeof emptyWorkspace>>;
+    delete older.guideOpen;
+    expect(normalizeWorkspace(older)?.guideOpen).toBe(true);
+    const lane = { sourceId: "source", trajectoryId: "one", band: "focus", axis: { start: 0, end: 1 } };
+    expect(normalizeWorkspace({ ...older, lanes: [lane] })?.guideOpen).toBe(false);
+    expect(normalizeWorkspace({ ...emptyWorkspace(), guideOpen: false, active: "guide" })?.active).toBe("rail");
+  });
+
   it("round-trips lanes, per-lane view state, and dockview layout JSON", () => {
     const workspace = emptyWorkspace();
     workspace.collectionView = "trials";

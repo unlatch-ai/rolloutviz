@@ -94,20 +94,24 @@ func ensureGallerySources(paths daemon.Paths) ([]string, error) {
 }
 
 func openGallery(paths []string, noOpen, jsonOutput bool) {
+	openGalleryCommand(paths, noOpen, jsonOutput, "demo")
+}
+
+func openGalleryCommand(paths []string, noOpen, jsonOutput bool, command string) {
 	daemonPaths, err := daemon.DefaultPaths()
 	if err != nil {
-		fatalError("demo", jsonOutput, err)
+		fatalError(command, jsonOutput, err)
 	}
 	executable, err := os.Executable()
 	if err != nil {
-		fatalError("demo", jsonOutput, fmt.Errorf("locate rlviz executable: %w", err))
+		fatalError(command, jsonOutput, fmt.Errorf("locate rlviz executable: %w", err))
 	}
 	manager := daemon.Manager{Paths: daemonPaths, Executable: executable, Args: []string{"daemon", "serve", "--runtime-dir", daemonPaths.RuntimeDir}, Version: version}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	ensured, err := manager.Ensure(ctx)
 	if err != nil {
-		fatalError("demo", jsonOutput, err)
+		fatalError(command, jsonOutput, err)
 	}
 	registeredPaths := make([]string, 0, len(paths))
 	sourceIDs := make([]string, 0, len(paths))
@@ -115,20 +119,20 @@ func openGallery(paths []string, noOpen, jsonOutput bool) {
 	for _, path := range paths {
 		registered, registerErr := (daemon.Client{}).Register(ctx, ensured.Metadata, daemon.RegisterRequest{Path: path})
 		if registerErr != nil {
-			fatalError("demo", jsonOutput, registerErr)
+			fatalError(command, jsonOutput, registerErr)
 		}
 		registeredPaths = append(registeredPaths, registered.Path)
 		sourceIDs = append(sourceIDs, registered.SourceID)
 		viewerURL, err = resolveViewerURL(ensured.Metadata, registered.URL)
 		if err != nil {
-			fatalError("demo", jsonOutput, err)
+			fatalError(command, jsonOutput, err)
 		}
 	}
 	viewerURL, err = markDemoURL(viewerURL)
 	if err != nil {
-		fatalError("demo", jsonOutput, err)
+		fatalError(command, jsonOutput, err)
 	}
-	output := openResult{URL: viewerURL, Path: registeredPaths[len(registeredPaths)-1], SourceID: sourceIDs[len(sourceIDs)-1], Paths: registeredPaths, SourceIDs: sourceIDs, Command: "demo", Mode: "daemon", Started: ensured.Started}
+	output := openResult{URL: viewerURL, Path: registeredPaths[len(registeredPaths)-1], SourceID: sourceIDs[len(sourceIDs)-1], Paths: registeredPaths, SourceIDs: sourceIDs, Command: command, Mode: "daemon", Started: ensured.Started}
 	writeOutput(output, jsonOutput, fmt.Sprintf("Opened 3-source synthetic RLViz gallery at %s", viewerURL))
 	if !noOpen {
 		if err := openBrowser(viewerURL); err != nil {
@@ -179,7 +183,7 @@ func ensureDemoSource(paths daemon.Paths) (string, error) {
 	return path, nil
 }
 
-func openSource(path, adapter string, presentationConfig json.RawMessage, noOpen, jsonOutput bool, command string) {
+func openSource(path, adapter string, presentationConfig json.RawMessage, noOpen, jsonOutput bool, command string) string {
 	paths, err := daemon.DefaultPaths()
 	if err != nil {
 		fatalError(command, jsonOutput, err)
@@ -226,6 +230,7 @@ func openSource(path, adapter string, presentationConfig json.RawMessage, noOpen
 			fmt.Fprintf(os.Stderr, "open browser: %v\n", err)
 		}
 	}
+	return registered.Path
 }
 
 func markDemoURL(value string) (string, error) {

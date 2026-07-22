@@ -20,8 +20,17 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function loadExample(page: Page, name: string) {
-  await page.getByRole("button", { name }).click();
   await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible({ timeout: 15_000 });
+  if (name !== "checkout cohort") {
+    await page.getByLabel("Example data").selectOption({ label: name });
+    await expect(page.getByText(new RegExp(`${name === "300-event coding trace" ? "coding-agent-bugfix" : "web-research-agent"}\\.ndjson is open`))).toBeVisible();
+  }
+  const guide = page.getByRole("article", { name: "RLViz guide" });
+  await expect(guide).toBeVisible();
+  await guide.getByRole("button", { name: "close" }).click();
+  const settings = page.getByRole("region", { name: "RLViz settings" });
+  await expect(settings).toBeVisible();
+  await settings.getByRole("button", { name: "close" }).click();
 }
 
 function target(page: Page, observable: Observable): Locator {
@@ -73,8 +82,13 @@ async function act(page: Page, action: FlowAction, boxes: Map<string, Awaited<Re
   if (action.kind === "reload") { await page.reload({ waitUntil: "domcontentloaded" }); await expect(page.locator(".workspace-rack")).toBeVisible(); return; }
   if (action.kind === "history-back") { await page.goBack(); return; }
   const shape = page.locator(`[data-event-index="${action.eventIndex}"]`);
-  await shape.hover();
-  return shape.click();
+  const shapeBox = await shape.boundingBox();
+  const svg = shape.locator("xpath=..");
+  const svgBox = await svg.boundingBox();
+  if (!shapeBox || !svgBox) throw new Error(`missing event shape ${action.eventIndex}`);
+  const position = { x: shapeBox.x + shapeBox.width / 2 - svgBox.x, y: shapeBox.y + shapeBox.height / 2 - svgBox.y };
+  await svg.hover({ position });
+  return svg.click({ position });
 }
 
 async function observe(page: Page, observable: Observable, boxes: Map<string, Awaited<ReturnType<Locator["boundingBox"]>>>, attributes: Map<string, string | null>) {

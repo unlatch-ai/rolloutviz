@@ -221,10 +221,34 @@ describe("instrument viewer", () => {
   it("switches light and dark mode through the data-theme attribute", () => {
     document.documentElement.setAttribute("data-theme", "light");
     render(<App initialTrajectory={sampleTrajectory} />);
-    const toggle = screen.getByRole("button", { name: "Switch to dark theme" });
-    fireEvent.click(toggle);
+    const dark = screen.getByRole("button", { name: "Dark" });
+    const light = screen.getByRole("button", { name: "Light" });
+    fireEvent.click(dark);
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
-    expect(toggle).toHaveAccessibleName("Switch to light theme");
+    expect(dark).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(light);
+    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+  });
+
+  it("opens browser visitors directly to installation guidance", () => {
+    render(<App initialTrajectory={sampleTrajectory} setup={{ mode: "browser" }} />);
+    expect(screen.getByRole("button", { name: "Install" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("Install or open RLViz");
+  });
+
+  it("restores the active rollout after closing Guide or Settings", async () => {
+    render(<App initialTrajectory={sampleTrajectory} />);
+    fireEvent.click(screen.getByRole("article", { name: "RLViz guide" }).querySelector("button")!);
+    fireEvent.click(screen.getByRole("region", { name: "RLViz settings" }).querySelector("button")!);
+    fireEvent.keyDown(window, { key: "Enter" });
+    const lane = await screen.findByRole("main", { name: "Read trajectory" });
+    const laneID = lane.getAttribute("data-lane-id");
+    fireEvent.keyDown(window, { key: "?" });
+    fireEvent.keyDown(window, { key: "?" });
+    expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", laneID);
+    fireEvent.keyDown(window, { key: "S", shiftKey: true });
+    fireEvent.keyDown(window, { key: "S", shiftKey: true });
+    expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", laneID);
   });
 
   it("focuses the reading surface on first load and restores it after navigation", async () => {
@@ -235,7 +259,7 @@ describe("instrument viewer", () => {
     const read = await screen.findByRole("main", { name: "Read trajectory" });
     await waitFor(() => expect(read).toHaveFocus());
     fireEvent.keyDown(read, { key: "j" });
-    expect(screen.getByText(/^#/i, { selector: ".selection-address" })).toHaveTextContent("#10");
+    expect(document.querySelector(".workspace-console .moment.selected .address")).toHaveTextContent("10");
   });
 
   it("keeps the selected event screen x stable across zoom in, out, and fit", async () => {
@@ -362,12 +386,12 @@ describe("instrument viewer", () => {
 
   it("uses hover as a skimmer without moving selection", async () => {
     await openRead();
-    const before = screen.getByText(/^#/i, { selector: ".selection-address" }).textContent;
+    const before = document.querySelector(".workspace-console .moment.selected .address")?.textContent;
     const svg = screen.getByRole("region", { name: "Trajectory shape" }).querySelector("svg")!;
     Object.defineProperty(svg, "getBoundingClientRect", { value: () => ({ left: 0, top: 0, width: 1000, height: 200, right: 1000, bottom: 200, x: 0, y: 0, toJSON() {} }) });
     fireEvent.mouseMove(svg, { clientX: 22, clientY: 50 });
     expect(await screen.findByRole("status")).toBeInTheDocument();
-    expect(screen.getByText(/^#/i, { selector: ".selection-address" })).toHaveTextContent(before ?? "");
+    expect(document.querySelector(".workspace-console .moment.selected .address")).toHaveTextContent(before ?? "");
     fireEvent.mouseLeave(svg);
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
   });
@@ -380,8 +404,7 @@ describe("instrument viewer", () => {
     fireEvent.keyDown(filter, { key: "j" }); fireEvent.change(filter, { target: { value: "j" } });
     expect(filter).toHaveValue("j");
     fireEvent.change(filter, { target: { value: "" } });
-    fireEvent.keyDown(window, { key: "?" });
-    expect(screen.getByRole("dialog", { name: "Active keyboard shortcuts" })).toHaveTextContent("Increase fidelity");
+    expect(screen.getByRole("region", { name: "Active module shortcuts" })).toHaveTextContent("Increase fidelity");
   });
 
   it("moves detail from right to bottom with the keyboard and persists its dockview layout", async () => {
@@ -392,8 +415,8 @@ describe("instrument viewer", () => {
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", "detail");
     fireEvent.keyDown(window, { key: "m", ctrlKey: true });
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-move-mode", "true");
-    expect(screen.getByRole("contentinfo", { name: "Active module keys" })).toHaveTextContent("Exit move mode");
-    expect(screen.getByRole("contentinfo", { name: "Active module keys" })).not.toHaveTextContent("Next event");
+    expect(screen.getByRole("region", { name: "Active module shortcuts" })).toHaveTextContent("Exit move mode");
+    expect(screen.getByRole("region", { name: "Active module shortcuts" })).not.toHaveTextContent("Next event");
     fireEvent.keyDown(window, { key: "m", ctrlKey: true });
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-move-mode", "false");
     fireEvent.keyDown(window, { key: "m", ctrlKey: true });
@@ -403,7 +426,7 @@ describe("instrument viewer", () => {
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-move-mode", "false");
     fireEvent.keyDown(window, { key: "w", ctrlKey: true });
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-resize-mode", "true");
-    expect(screen.getByRole("contentinfo", { name: "Active module keys" })).toHaveTextContent("Exit resize mode");
+    expect(screen.getByRole("region", { name: "Active module shortcuts" })).toHaveTextContent("Exit resize mode");
     fireEvent.keyDown(window, { key: "w", ctrlKey: true });
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-resize-mode", "false");
     const serialized = new URLSearchParams(window.location.search).get("workspace");
@@ -493,7 +516,7 @@ describe("instrument viewer", () => {
     expect(detail.querySelector(".moment.selected")).toHaveTextContent("Stale confirmation token");
     fireEvent.keyDown(window, { key: "j" });
     expect(detail.querySelector(".moment.selected")).toHaveTextContent("Task completion grader");
-    expect(screen.getByRole("contentinfo", { name: "Active module keys" })).toHaveTextContent("Previous event");
+    expect(screen.getByRole("region", { name: "Active module shortcuts" })).toHaveTextContent("Previous event");
   });
 
   it("removes the empty lane group when the final lane closes", async () => {
@@ -501,8 +524,8 @@ describe("instrument viewer", () => {
     fireEvent.keyDown(window, { key: "Enter" });
     await screen.findByRole("main", { name: "Read trajectory" });
     fireEvent.keyDown(window, { key: "x" });
-    expect(screen.getByText("Open a rollout from the collection.")).toBeInTheDocument();
-    expect(document.querySelector(".detail-empty")?.closest(".workspace-console")).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "RLViz guide" })).toBeInTheDocument();
+    expect(document.querySelector(".detail-empty")).not.toBeInTheDocument();
     expect(document.querySelector(".empty-stage")).not.toBeInTheDocument();
     expect(document.querySelectorAll(".dv-groupview:has(.lane-track)")).toHaveLength(0);
   });

@@ -19,6 +19,7 @@ const userConfigSchemaVersion = 1
 type userConfig struct {
 	SchemaVersion int    `json:"schema_version"`
 	OpenMode      string `json:"open_mode"`
+	LastSource    string `json:"last_source,omitempty"`
 }
 
 type initOptions struct {
@@ -65,24 +66,15 @@ func runInitWizard(input io.Reader, output io.Writer, options initOptions) (init
 		return initResult{}, err
 	}
 	reader := bufio.NewReader(input)
-	mode := "browser"
 	fmt.Fprintln(output, "RLViz first-run setup")
-	if options.Interactive && !options.Yes {
-		answer, err := prompt(reader, output, "Default interface: browser, tui, or both? [browser] ")
-		if err != nil {
-			return initResult{}, err
-		}
-		if strings.TrimSpace(answer) != "" {
-			mode = strings.ToLower(strings.TrimSpace(answer))
-		}
-		if mode != "browser" && mode != "tui" && mode != "both" {
-			return initResult{}, errors.New("interface must be browser, tui, or both")
-		}
+	existing, _, loadErr := loadUserConfigFrom(configPath)
+	if loadErr != nil {
+		return initResult{}, loadErr
 	}
-	if err := writeUserConfig(configPath, userConfig{SchemaVersion: userConfigSchemaVersion, OpenMode: mode}); err != nil {
+	if err := writeUserConfig(configPath, userConfig{SchemaVersion: userConfigSchemaVersion, OpenMode: "browser", LastSource: existing.LastSource}); err != nil {
 		return initResult{}, err
 	}
-	fmt.Fprintf(output, "Saved default interface %q to %s\n", mode, configPath)
+	fmt.Fprintf(output, "Saved browser viewer configuration to %s\n", configPath)
 
 	if options.Interactive && !options.Yes {
 		selection, err := prompt(reader, output, "Install agent skills? Enter codex, claude-code, cursor (comma-separated), or none [none] ")
@@ -250,6 +242,10 @@ func loadUserConfig() (userConfig, bool, error) {
 	if err != nil {
 		return userConfig{}, false, err
 	}
+	return loadUserConfigFrom(path)
+}
+
+func loadUserConfigFrom(path string) (userConfig, bool, error) {
 	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return userConfig{}, false, nil
@@ -264,7 +260,26 @@ func loadUserConfig() (userConfig, bool, error) {
 	if config.SchemaVersion != userConfigSchemaVersion || (config.OpenMode != "browser" && config.OpenMode != "tui" && config.OpenMode != "both") {
 		return userConfig{}, true, errors.New("RLViz config has an unsupported schema or open_mode")
 	}
+	// Older releases allowed terminal trajectory rendering. Preserve the config
+	// file but route every open through the single browser viewer.
+	config.OpenMode = "browser"
 	return config, true, nil
+}
+
+func rememberLastSource(config userConfig, configured bool, source string) error {
+	absolute, err := filepath.Abs(source)
+	if err != nil {
+		return fmt.Errorf("resolve last source: %w", err)
+	}
+	if !configured {
+		config = userConfig{SchemaVersion: userConfigSchemaVersion, OpenMode: "browser"}
+	}
+	config.LastSource = absolute
+	path, err := userConfigPath("")
+	if err != nil {
+		return err
+	}
+	return writeUserConfig(path, config)
 }
 
 func writeUserConfig(path string, config userConfig) error {

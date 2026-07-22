@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { ViewerProvider } from "../../web/src/provider";
 import codingExample from "../../examples/gallery/coding-agent-bugfix.ndjson?url";
 import researchExample from "../../examples/gallery/web-research-agent.ndjson?url";
@@ -39,6 +39,7 @@ interface PendingAdapter {
 
 export function BrowserApp() {
   const [provider, setProvider] = useState<ViewerProvider>();
+  const [activeSample, setActiveSample] = useState("checkout-cohort.ndjson");
   const [source, setSource] = useState<{ bytes: Uint8Array; name: string }>();
   const [status, setStatus] = useState("Ready for a canonical, Inspect AI, or Verifiers trace.");
   const [busy, setBusy] = useState(false);
@@ -47,6 +48,7 @@ export function BrowserApp() {
   const [pendingAdapter, setPendingAdapter] = useState<PendingAdapter>();
   const traceInput = useRef<HTMLInputElement>(null);
   const adapterInput = useRef<HTMLInputElement>(null);
+  const autoLoaded = useRef(false);
 
   const openBytes = useCallback(async (bytes: Uint8Array, name: string) => {
     setBusy(true); setStatus(`Parsing ${name} in this tab…`);
@@ -65,10 +67,12 @@ export function BrowserApp() {
 
   const openFile = async (file?: File) => {
     if (!file) return;
+    setActiveSample("");
     await openBytes(new Uint8Array(await file.arrayBuffer()), file.name);
   };
 
   const openExample = async (url: string, name: string) => {
+    setActiveSample(name);
     setBusy(true); setStatus(`Loading ${name}…`);
     try {
       const response = await fetch(url);
@@ -79,6 +83,12 @@ export function BrowserApp() {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (autoLoaded.current) return;
+    autoLoaded.current = true;
+    void openExample(cohortExample, "checkout-cohort.ndjson");
+  }, []);
 
   const chooseAdapter = async (file?: File) => {
     if (!file) return;
@@ -121,10 +131,8 @@ export function BrowserApp() {
       </section>
       <section className="privacy-proof" aria-label="Privacy guarantees"><div><b>zero upload</b><span>File and adapter APIs read local bytes directly.</span></div><div><b>in-memory index</b><span>No SQLite, account, cache, or server is involved.</span></div><div><b>static app</b><span>No CDN dependencies. Opened trace bytes never leave the tab.</span></div></section>
     </main> : <>
-      <header className="viewer-bar"><div><b>RLViz browser viewer</b><span>{status}</span></div><div><button onClick={() => traceInput.current?.click()}>open another trace</button><button onClick={() => adapterInput.current?.click()}>WASM adapter</button><button onClick={() => setHelp(true)}>adapter help</button></div></header>
-      <Suspense fallback={<div className="viewer-loading" role="status">loading viewer…</div>}><Viewer provider={provider} /></Suspense>
+      <Suspense fallback={<div className="viewer-loading" role="status">loading viewer…</div>}><Viewer provider={provider} setup={{ mode: "browser", status, samples: [...(activeSample ? [] : [{ label: "local trace", value: "" }]), ...examples.map(([label, value]) => ({ label, value }))], selectedSample: activeSample, onSample: (value) => { const sample = examples.find(([, name]) => name === value); if (sample) void openExample(sample[2], sample[1]); }, onOpenTrace: () => traceInput.current?.click(), onOpenAdapter: () => adapterInput.current?.click(), onAdapterHelp: () => setHelp(true) }} /></Suspense>
     </>}
-    <footer className="browser-footer"><a href="/docs.html">documentation</a><span>private formats and larger cohorts: <code>brew install TheSnakeFang/tap/rlviz</code></span></footer>
     {help && <div className="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="adapter-help-title"><section><header><h2 id="adapter-help-title">Ask your local coding agent</h2><button onClick={() => setHelp(false)}>close</button></header><p>This prompt defines the complete browser adapter contract. The app does not send it or your trace anywhere.</p><pre>{adapterPrompt}</pre><button onClick={() => void navigator.clipboard.writeText(adapterPrompt)}>copy prompt</button></section></div>}
     {pendingAdapter && <div className="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="adapter-confirm-title"><section><header><h2 id="adapter-confirm-title">Confirm browser adapter</h2><button onClick={() => setPendingAdapter(undefined)}>cancel</button></header><p>This module can compute inside the browser sandbox. It receives the current trace bytes and is not persisted.</p><dl><dt>module</dt><dd>{pendingAdapter.name}</dd><dt>size</dt><dd>{pendingAdapter.size.toLocaleString()} bytes</dd><dt>SHA-256</dt><dd><code>{pendingAdapter.digest}</code></dd></dl><button className="primary" disabled={!source} onClick={() => void confirmAdapter()}>{source ? "confirm and run once" : "open a trace first"}</button></section></div>}
   </div>;
