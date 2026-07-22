@@ -63,6 +63,7 @@ work, and `later` is an intended capability without a committed release.
 - `current` One always-visible keybar generated from the active module's command bindings.
 - `current` Customizable keymap storage and active-shortcut help.
 - `current` Shareable logical workspace links and bounded, device-local dock geometry.
+- `current` Device-local editable titles and descriptions for collections and trajectories, without changing source traces.
 - `next` Onboarding and a complete keybinding-remap UI backed by the shared config.
 
 ### Comparison and derived analysis

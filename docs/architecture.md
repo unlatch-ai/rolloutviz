@@ -176,6 +176,8 @@ The React application has three levels of research surfaces:
   cache ownership, and stale-response rejection
 - `workspaceDock.ts`: the adapter between logical workspace modules and
   Dockview panel IDs, default placement, reconciliation, and focus targets
+- `viewerMetadata.ts`: bounded device-local collection and trajectory labels;
+  source traces and shared workspace URLs remain unchanged
 - `ContextTrack.tsx`: sparse context observations, lifecycle navigation, and
   exact selected-event context evidence without interpolation
 - `ContextDetails.tsx`: selected context facts, provenance, derivation, and

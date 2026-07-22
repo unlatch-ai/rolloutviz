@@ -19,6 +19,8 @@ import { useWorkspaceController } from "./workspaceController";
 import { useLaneDataLoader } from "./laneLoader";
 import type { LaneData } from "./laneLoader";
 import { focusElementForTarget, lanePanelId, panelIdForTarget, pinnedDetailLaneId, pinnedDetailTarget, reconcileDockPanels, targetFromPanelId } from "./workspaceDock";
+import { collectionMetadataKey, useViewerMetadata } from "./viewerMetadata";
+import type { EditableMetadata } from "./viewerMetadata";
 
 const fidelityNames = ["hairline", "glyphs", "detail"];
 
@@ -28,6 +30,9 @@ function metric(row: BrowseTrajectory, name: string): unknown {
 }
 
 function rowKey(row: BrowseTrajectory): string { return laneId(row.source_id, row.trajectory.id); }
+function rowSearchText(row: BrowseTrajectory, metadata?: EditableMetadata): string {
+  return `${metadata?.title ?? ""} ${metadata?.description ?? ""} ${row.trajectory.id} ${row.source_name} ${row.case_name ?? ""} ${row.group_name ?? ""}`.toLowerCase();
+}
 function eventDetail(event: TrajectoryEvent): unknown { return event.output ?? event.input ?? event.content ?? event.data ?? event.raw ?? event; }
 function eventText(event: TrajectoryEvent): string { return title(event) || `${event.kind} event`; }
 function eventToolNames(event: TrajectoryEvent): string[] {
@@ -67,6 +72,37 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
   </div>;
 }
 
+function EditableHeader({ kind, fallbackTitle, metadata, context, onSave }: {
+  kind: "collection" | "trajectory";
+  fallbackTitle: string;
+  metadata?: EditableMetadata;
+  context?: string;
+  onSave: (value: EditableMetadata) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const Heading = kind === "collection" ? "h1" : "h2";
+  const begin = () => {
+    setTitleDraft(metadata?.title ?? "");
+    setDescriptionDraft(metadata?.description ?? "");
+    setEditing(true);
+  };
+  if (editing) return <form className={`metadata-editor ${kind}`} onClick={(event) => event.stopPropagation()} onSubmit={(event) => {
+    event.preventDefault();
+    onSave({ title: titleDraft, description: descriptionDraft });
+    setEditing(false);
+  }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setEditing(false); } }}>
+    <label>Title<input aria-label={`${kind} title`} autoFocus maxLength={120} value={titleDraft} placeholder={fallbackTitle} onChange={(event) => setTitleDraft(event.target.value)} /></label>
+    <label>Description<textarea aria-label={`${kind} description`} maxLength={500} value={descriptionDraft} placeholder="Add a concise description" onChange={(event) => setDescriptionDraft(event.target.value)} /></label>
+    <span><button type="submit">save</button><button type="button" onClick={() => setEditing(false)}>cancel</button></span>
+  </form>;
+  return <div className={`editable-metadata ${kind}`}>
+    <div><Heading>{metadata?.title ?? fallbackTitle}</Heading>{metadata?.description && <p>{metadata.description}</p>}{context && <small className={kind === "trajectory" ? "workspace-breadcrumb" : undefined}>{context}</small>}</div>
+    <button type="button" className="metadata-edit" aria-label={`Edit ${kind} title and description`} onClick={(event) => { event.stopPropagation(); begin(); }}>edit</button>
+  </div>;
+}
+
 function CollectionStrip({ row, fidelity }: { row: BrowseTrajectory; fidelity: number }) {
   const count = Math.max(1, Number(metric(row, "event_count") ?? 1));
   const errors = Number(metric(row, "error_count") ?? 0);
@@ -92,8 +128,9 @@ function CollectionStrip({ row, fidelity }: { row: BrowseTrajectory; fidelity: n
   return <span className="cat-glyphs" style={{ width: `${width}%` }}>{glyphSlots}{fidelity >= 2 && <small>{shape.events} events{errors ? ` · ${errors} errors` : ""}</small>}</span>;
 }
 
-function Rail({ root, rows, workspace, fidelity, onActivate, onSelect, onOpen, onAdd, onQuery, onCollectionView }: {
+function Rail({ root, rows, workspace, fidelity, metadata, trajectoryMetadata, onMetadata, onActivate, onSelect, onOpen, onAdd, onQuery, onCollectionView }: {
   root: RefObject<HTMLElement | null>; rows: BrowseTrajectory[]; workspace: WorkspaceState; fidelity: number;
+  metadata?: EditableMetadata; trajectoryMetadata: Record<string, EditableMetadata>; onMetadata: (value: EditableMetadata) => void;
   onActivate: () => void; onSelect: (index: number) => void; onOpen: () => void; onAdd: () => void; onQuery: (query: string) => void; onCollectionView: (view: WorkspaceState["collectionView"]) => void;
 }) {
   const selected = Math.min(workspace.railSelected, Math.max(0, rows.length - 1));
@@ -115,12 +152,12 @@ function Rail({ root, rows, workspace, fidelity, onActivate, onSelect, onOpen, o
     return groups;
   }, new Map<string, typeof indexedRows>())];
   const renderRow = ({ row, index }: typeof indexedRows[number]) => <button key={rowKey(row)} role="option" data-index={index} aria-selected={index === selected} data-fidelity-level={`L${fidelity}`} data-columns={fidelity >= 2 ? "true" : "false"} className={`browse-row ${index === selected ? "selected" : ""}`} onClick={() => onSelect(index)} onDoubleClick={onOpen}>
-    {fidelity >= 1 && <span className="verdict">{verdictGlyph(row)}</span>}<span className="identity"><b>{row.trajectory.id}</b>{fidelity >= 2 && <small>{row.case_name ?? row.group_name ?? row.source_name}</small>}</span><CollectionStrip row={row} fidelity={fidelity} />
+    {fidelity >= 1 && <span className="verdict">{verdictGlyph(row)}</span>}<span className="identity"><b>{trajectoryMetadata[rowKey(row)]?.title ?? row.trajectory.id}</b>{fidelity >= 2 && <small>{trajectoryMetadata[rowKey(row)]?.title ? `${row.trajectory.id}${trajectoryMetadata[rowKey(row)]?.description ? ` · ${trajectoryMetadata[rowKey(row)]?.description}` : ""}` : row.case_name ?? row.group_name ?? row.source_name}</small>}</span><CollectionStrip row={row} fidelity={fidelity} />
     {fidelity >= 2 && <><span className="numeric events-column">{String(metric(row, "event_count") ?? "—")} ev</span><span className="numeric reward-column">{metric(row, "reward") === undefined ? "" : `r ${String(metric(row, "reward"))}`}</span></>}
     {fidelity >= 2 && <span className="row-state">{row.source_name}{row.group_name ? ` · ${row.group_name}` : ""}</span>}
   </button>;
   return <main ref={root} tabIndex={0} className={`workspace-rail ${workspace.active === "rail" ? "active-zone" : ""}`} aria-label="Browse trajectories" data-filter={workspace.railQuery} data-fidelity={fidelityNames[fidelity]} data-collection-view={workspace.collectionView} onFocus={onActivate}>
-    <header><div><h1>Trajectories</h1><p>{rows.length === 1 ? "1 trajectory" : `${rows.length} trajectories`}</p></div></header>
+    <header><EditableHeader kind="collection" fallbackTitle="Trajectories" metadata={metadata} context={rows.length === 1 ? "1 trajectory" : `${rows.length} trajectories`} onSave={onMetadata} /></header>
     <div className="rail-controls"><label>Filter <input id="browse-filter" value={workspace.railQuery} onChange={(event) => onQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); root.current?.focus(); } }} /></label><div className="rail-view-toggle" role="group" aria-label="Collection view"><span>view</span><button className={workspace.collectionView === "rollouts" ? "active" : ""} aria-pressed={workspace.collectionView === "rollouts"} onClick={() => onCollectionView("rollouts")}>rollouts</button><button className={workspace.collectionView === "trials" ? "active" : ""} aria-pressed={workspace.collectionView === "trials"} onClick={() => onCollectionView("trials")}>trials</button></div></div>
     <div className="fidelity-readout">fidelity <b>{fidelityNames[fidelity]}</b> · [ ]</div>
     <section ref={listRef} className={`browse-list rail-fidelity-${fidelity}`} role="listbox" aria-label="Trajectory collection" data-fidelity-level={`L${fidelity}`} onWheel={(event) => {
@@ -281,8 +318,8 @@ function SourceRecord({ event }: { event: TrajectoryEvent }) {
   return <section className="lane-source" aria-label="Event source"><div className="source-provenance"><h3>Provenance</h3><dl><dt>event</dt><dd>{event.id}</dd><dt>address</dt><dd>#{event.sequence}</dd><dt>source</dt><dd>{event.source?.path ?? "canonical record"}{event.source?.line ? `:${event.source.line}` : ""}</dd>{event.source?.byte_start !== undefined && <><dt>bytes</dt><dd>{event.source.byte_start}–{event.source.byte_end ?? "?"}</dd></>}</dl></div><div><h3>Raw normalized record</h3><pre>{JSON.stringify(event.raw ?? event, null, 2)}</pre></div></section>;
 }
 
-function LaneTrack({ lane, data, active, reference, hover, onActivate, onSelect, onHover, onDescend, onAscend, onAxisChange }: {
-  lane: WorkspaceLane; data?: LaneData; active: boolean; reference: boolean; hover?: number; onActivate: () => void; onSelect: (index: number) => void; onHover: (index?: number) => void; onDescend: (episode?: Episode) => void; onAscend: () => void; onAxisChange: (axis: { start: number; end: number }) => void;
+function LaneTrack({ lane, data, metadata, active, reference, hover, onActivate, onSelect, onHover, onDescend, onAscend, onAxisChange }: {
+  lane: WorkspaceLane; data?: LaneData; metadata?: EditableMetadata; active: boolean; reference: boolean; hover?: number; onActivate: () => void; onSelect: (index: number) => void; onHover: (index?: number) => void; onDescend: (episode?: Episode) => void; onAscend: () => void; onAxisChange: (axis: { start: number; end: number }) => void;
 }) {
   const trajectory = data?.trajectory;
   const depth = effectiveDepth(lane);
@@ -291,7 +328,7 @@ function LaneTrack({ lane, data, active, reference, hover, onActivate, onSelect,
   const selectedEpisode = episodeIndexForEvent(episodes, selected);
   const episode = episodes[selectedEpisode];
   return <main tabIndex={0} aria-label={lane.band === "focus" ? "Read trajectory" : `Context lane ${lane.trajectoryId}`} className={`lane-track depth-${depth} fidelity-${lane.fidelity} ${lane.band}-lane ${active ? "active-zone" : ""} ${reference ? "reference-lane" : ""}`} data-lane-id={lane.id} data-trajectory={lane.trajectoryId} data-depth={depth} data-stored-depth={lane.depth} data-fidelity={fidelityNames[lane.fidelity]} data-episode={episode?.key ?? ""} data-axis-start={lane.axis.start.toFixed(4)} data-axis-end={lane.axis.end.toFixed(4)} onFocus={onActivate} onClick={onActivate}>
-    <header><span><b>{lane.trajectoryId}</b>{reference && <small>reference</small>}</span><span className="lane-state">{["", "overview", "episodes", "events", "raw"][depth]}{depth === 1 ? ` · ${fidelityNames[lane.fidelity]} · [ ]` : ""}</span></header>
+    <header><span title={lane.trajectoryId}><b>{metadata?.title ?? lane.trajectoryId}</b>{metadata?.description && <small>{metadata.description}</small>}{reference && <small>reference</small>}</span><span className="lane-state">{["", "overview", "episodes", "events", "raw"][depth]}{depth === 1 ? ` · ${fidelityNames[lane.fidelity]} · [ ]` : ""}</span></header>
     <div className="lane-body">{!trajectory ? <div className="lane-loading">loading trajectory…</div> : depth === 1 ? <><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} fidelity={lane.fidelity} compact={lane.band === "context"} label={lane.band === "focus" ? "Trajectory shape" : `Trajectory shape ${lane.trajectoryId}`} onSelect={onSelect} onHover={onHover} />{lane.fidelity === 2 && lane.band === "focus" && <OverviewSteps trajectory={trajectory} axis={lane.axis} selected={selected} onSelect={onSelect} />}</> : depth === 2 ? <EpisodeStrip trajectory={trajectory} lane={lane} episodes={episodes} selectedEpisode={selectedEpisode} onDescend={(target) => onDescend(target)} /> : <><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} compact label="Compressed trajectory shape" onSelect={onSelect} onHover={onHover} onAscend={onAscend} />{depth === 3 && episode && <ScopedEvents trajectory={trajectory} episode={episode} selected={selected} onSelect={onSelect} />}{depth === 4 && trajectory.events[selected] && <SourceRecord event={trajectory.events[selected]} />}</>}</div>
     {trajectory && <AxisNavigator trajectory={trajectory} axis={lane.axis} onChange={onAxisChange} />}
     {trajectory && hover !== undefined && depth === 1 && lane.band === "focus" && <aside className="skim-preview" role="status"><b>#{trajectory.events[hover].sequence} · {trajectory.events[hover].kind}</b><span>{eventText(trajectory.events[hover])}</span></aside>}
@@ -309,14 +346,14 @@ function judgesFor(trajectory: Trajectory): Array<{ label: string; value: string
   return judges;
 }
 
-function Console({ workspace, lane, data, breadcrumb, resizeMode, dockPosition, pinned = false, active = false, onSelect, onHelp, onActivate }: {
-  workspace: WorkspaceState; lane?: WorkspaceLane; data?: LaneData; breadcrumb: string; resizeMode: boolean; dockPosition: "right" | "bottom"; pinned?: boolean; active?: boolean; onSelect: (index: number) => void; onHelp: () => void; onActivate: () => void;
+function Console({ workspace, lane, data, metadata, breadcrumb, resizeMode, dockPosition, pinned = false, active = false, onMetadata, onSelect, onHelp, onActivate }: {
+  workspace: WorkspaceState; lane?: WorkspaceLane; data?: LaneData; metadata?: EditableMetadata; breadcrumb: string; resizeMode: boolean; dockPosition: "right" | "bottom"; pinned?: boolean; active?: boolean; onMetadata: (value: EditableMetadata) => void; onSelect: (index: number) => void; onHelp: () => void; onActivate: () => void;
 }) {
   const trajectory = data?.trajectory; const current = trajectory?.events[Math.min(lane?.selected ?? 0, Math.max(0, trajectory.events.length - 1))];
   const around = 2;
   const detailRows = trajectory && current ? trajectory.events.slice(Math.max(0, trajectory.events.indexOf(current) - around), Math.min(trajectory.events.length, trajectory.events.indexOf(current) + around + 1)) : [];
   return <section className={`workspace-console ${active ? "active-zone" : ""}`} tabIndex={0} onFocus={() => { if (active) onActivate(); }} onPointerDown={onActivate} aria-label={pinned ? `Detail for ${lane?.trajectoryId ?? "rollout"}` : "Workspace console"} data-detail-lane-id={lane?.id} data-pinned={pinned ? "true" : "false"} data-resize-mode={resizeMode ? "true" : "false"} data-dock-position={dockPosition}>
-    <header className="console-header"><div><h2>{trajectory?.name ?? trajectory?.id ?? "No lane selected"}</h2><p className="workspace-breadcrumb">{breadcrumb}</p></div>
+    <header className="console-header">{trajectory ? <EditableHeader kind="trajectory" fallbackTitle={trajectory.name ?? trajectory.id} metadata={metadata} context={breadcrumb} onSave={onMetadata} /> : <div><h2>No lane selected</h2><p className="workspace-breadcrumb">{breadcrumb}</p></div>}
       {trajectory && <div className="judge-list">{judgesFor(trajectory).map((judge, index) => <button key={`${judge.label}:${index}`} className={/false|fail/i.test(judge.value) ? "failure" : judge.label === "verifier" && /true|pass/i.test(judge.value) ? "verifier-pass" : ""} onClick={() => { const found = trajectory.events.findIndex((event) => event.id === judge.eventId); if (found >= 0) onSelect(found); }}><small>{judge.label}</small><b>{judge.value}</b></button>)}</div>}
       <div className="console-meta">{pinned && <strong>pinned rollout</strong>}<span>reference: <b data-testid="reference-name">{workspace.reference ? workspace.lanes.find((item) => item.id === workspace.reference)?.trajectoryId ?? "none" : "none"}</b></span>{resizeMode && <strong>resize mode · arrows · Esc</strong>}<button onClick={onHelp}>?</button></div>
     </header>
@@ -335,8 +372,14 @@ function WorkspacePanel({ params }: IDockviewPanelProps<{ kind: "collection" | "
   return <div className="focus-slot">{content.lane(params.laneId ?? "")}</div>;
 }
 
-function MinimalTab({ params }: IDockviewPanelHeaderProps<{ label?: string }>) {
-  return <span className="workspace-tab">{params.label ?? "module"}</span>;
+function MinimalTab({ api }: IDockviewPanelHeaderProps<{ label?: string }>) {
+  const [title, setTitle] = useState(api.title);
+  useEffect(() => {
+    const disposable = api.onDidTitleChange((event) => setTitle(event.title));
+    if (title !== api.title) setTitle(api.title);
+    return () => disposable.dispose();
+  }, [api]);
+  return <span className="workspace-tab">{title || "module"}</span>;
 }
 
 const dockComponents = { workspace: WorkspacePanel };
@@ -382,9 +425,11 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
     onError: setError,
     onPresentation: setPresentation,
   });
+  const { metadata: viewerMetadata, updateCollection, updateTrajectory } = useViewerMetadata();
 
   const ordered = browse.trajectories;
-  const filtered = useMemo(() => ordered.filter((row) => !workspace.railQuery || `${row.trajectory.id} ${row.source_name} ${row.case_name ?? ""} ${row.group_name ?? ""}`.toLowerCase().includes(workspace.railQuery.toLowerCase())), [ordered, workspace.railQuery]);
+  const collectionKey = useMemo(() => collectionMetadataKey(browse.sources.map((source) => source.id)), [browse.sources]);
+  const filtered = useMemo(() => ordered.filter((row) => !workspace.railQuery || rowSearchText(row, viewerMetadata.trajectories[rowKey(row)]).includes(workspace.railQuery.toLowerCase())), [ordered, viewerMetadata.trajectories, workspace.railQuery]);
   const boundedRail = Math.min(workspace.railSelected, Math.max(0, filtered.length - 1)); const selectedRow = filtered[boundedRail];
   const pinnedActiveLane = pinnedDetailLaneId(workspace.active);
   const activeLane = workspace.lanes.find((lane) => lane.id === workspace.active || lane.id === pinnedActiveLane) ?? (workspace.active === "detail" ? workspace.lanes.find((lane) => lane.id === lastFocus.current) ?? workspace.lanes.find((lane) => lane.band === "focus") : undefined);
@@ -637,6 +682,17 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
   }, [annotateDockGeometry, change, persistDockLayout, reconcileDock]);
 
   useEffect(() => { if (dockApiRef.current) reconcileDock(dockApiRef.current); }, [reconcileDock, workspace.details, workspace.lanes, workspace.railExpanded]);
+  useEffect(() => {
+    const api = dockApiRef.current;
+    if (!api) return;
+    api.getPanel("collection")?.api.setTitle(viewerMetadata.collections[collectionKey]?.title ?? "Collection");
+    api.getPanel("detail")?.api.setTitle("Detail");
+    workspace.lanes.forEach((lane) => {
+      const title = viewerMetadata.trajectories[lane.id]?.title ?? lane.trajectoryId;
+      api.getPanel(lanePanelId(lane.id))?.api.setTitle(title);
+      api.getPanel(pinnedDetailTarget(lane.id))?.api.setTitle(`Detail · ${title}`);
+    });
+  }, [collectionKey, dockReady, viewerMetadata, workspace.lanes]);
 
   const dockDetail = useCallback((position: "right" | "bottom") => {
     const api = dockApiRef.current, detail = api?.getPanel("detail");
@@ -732,9 +788,9 @@ export function App({ initialTrajectory, provider = daemonProvider }: { initialT
   }, !help);
 
   const dockContent: DockContent = {
-    collection: <Rail root={railRef} rows={filtered} workspace={{ ...workspace, railSelected: boundedRail }} fidelity={railFidelity} onActivate={() => change((current) => ({ ...current, active: "rail" }))} onSelect={(index) => change((current) => ({ ...current, railSelected: index, active: "rail" }))} onOpen={() => openSelected(false)} onAdd={() => openSelected(true)} onCollectionView={(collectionView) => change((current) => ({ ...current, collectionView }))} onQuery={(railQuery) => change((current) => { const next = ordered.filter((row) => !railQuery || `${row.trajectory.id} ${row.source_name} ${row.case_name ?? ""} ${row.group_name ?? ""}`.toLowerCase().includes(railQuery.toLowerCase())); const kept = selectedRow ? next.findIndex((row) => rowKey(row) === rowKey(selectedRow)) : -1; return { ...current, railQuery, railSelected: kept >= 0 ? kept : 0 }; })} />,
-    lane: (id) => { const lane = workspace.lanes.find((item) => item.id === id); return lane ? <LaneTrack lane={lane} data={laneData.get(lane.id)} active={workspace.active === lane.id} reference={workspace.reference === lane.id} hover={hover[lane.id]} onActivate={() => change((current) => ({ ...current, active: lane.id }))} onSelect={(value) => selectEvent(lane.id, value)} onHover={(value) => setHover((current) => ({ ...current, [lane.id]: value }))} onDescend={(episode) => descendLane(lane.id, episode)} onAscend={() => ascendLane(lane.id)} onAxisChange={(axis) => updateLane(lane.id, (current) => ({ ...current, axis }), false)} /> : null; },
-    detail: (id) => { const lane = id ? workspace.lanes.find((item) => item.id === id) : activeLane; const target = id ? pinnedDetailTarget(id) : "detail"; return <Console workspace={workspace} lane={lane} data={lane ? laneData.get(lane.id) : undefined} breadcrumb={id && lane ? `${lane.trajectoryId} · detail` : breadcrumb} resizeMode={resizeMode} dockPosition={detailPosition} pinned={!!id} active={workspace.active === target} onSelect={(index) => lane && selectEvent(lane.id, index)} onHelp={() => setHelp(true)} onActivate={() => { if (!id && openingPinned.current) return; change((current) => ({ ...current, active: target })); }} />; },
+    collection: <Rail root={railRef} rows={filtered} workspace={{ ...workspace, railSelected: boundedRail }} fidelity={railFidelity} metadata={viewerMetadata.collections[collectionKey]} trajectoryMetadata={viewerMetadata.trajectories} onMetadata={(value) => updateCollection(collectionKey, value)} onActivate={() => change((current) => ({ ...current, active: "rail" }))} onSelect={(index) => change((current) => ({ ...current, railSelected: index, active: "rail" }))} onOpen={() => openSelected(false)} onAdd={() => openSelected(true)} onCollectionView={(collectionView) => change((current) => ({ ...current, collectionView }))} onQuery={(railQuery) => change((current) => { const next = ordered.filter((row) => !railQuery || rowSearchText(row, viewerMetadata.trajectories[rowKey(row)]).includes(railQuery.toLowerCase())); const kept = selectedRow ? next.findIndex((row) => rowKey(row) === rowKey(selectedRow)) : -1; return { ...current, railQuery, railSelected: kept >= 0 ? kept : 0 }; })} />,
+    lane: (id) => { const lane = workspace.lanes.find((item) => item.id === id); return lane ? <LaneTrack lane={lane} data={laneData.get(lane.id)} metadata={viewerMetadata.trajectories[lane.id]} active={workspace.active === lane.id} reference={workspace.reference === lane.id} hover={hover[lane.id]} onActivate={() => change((current) => ({ ...current, active: lane.id }))} onSelect={(value) => selectEvent(lane.id, value)} onHover={(value) => setHover((current) => ({ ...current, [lane.id]: value }))} onDescend={(episode) => descendLane(lane.id, episode)} onAscend={() => ascendLane(lane.id)} onAxisChange={(axis) => updateLane(lane.id, (current) => ({ ...current, axis }), false)} /> : null; },
+    detail: (id) => { const lane = id ? workspace.lanes.find((item) => item.id === id) : activeLane; const target = id ? pinnedDetailTarget(id) : "detail"; return <Console workspace={workspace} lane={lane} data={lane ? laneData.get(lane.id) : undefined} metadata={lane ? viewerMetadata.trajectories[lane.id] : undefined} breadcrumb={id && lane ? `${lane.trajectoryId} · detail` : breadcrumb} resizeMode={resizeMode} dockPosition={detailPosition} pinned={!!id} active={workspace.active === target} onMetadata={(value) => lane && updateTrajectory(lane.id, value)} onSelect={(index) => lane && selectEvent(lane.id, index)} onHelp={() => setHelp(true)} onActivate={() => { if (!id && openingPinned.current) return; change((current) => ({ ...current, active: target })); }} />; },
   };
   return <ViewerProviderContext.Provider value={provider}><DockContentContext.Provider value={dockContent}><div className={`instrument-shell workspace-rack rail-${workspace.railExpanded ? "open" : "closed"}`} data-filter={workspace.railQuery} data-direction={workspace.direction} data-active-zone={workspace.active} data-move-mode={moveMode ? "true" : "false"} data-resize-mode={resizeMode ? "true" : "false"}>
     <button className="theme-toggle" aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`} onClick={() => setTheme((current) => current === "light" ? "dark" : "light")}>{theme}</button>

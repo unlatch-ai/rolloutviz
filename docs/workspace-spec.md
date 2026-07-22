@@ -47,6 +47,10 @@ MIT, with floating panels and popout windows disabled):
 
 ## 2. The collection module
 
+Collection and trajectory titles and descriptions may be edited as local
+presentation metadata. These labels stay in browser storage and never modify
+the source trace or become part of a shared workspace URL.
+
 - One list, one representation control: the **fidelity ladder** `[` `]` with
   exactly three levels, each with a stated purpose:
   - **hairline** — the cohort's shape at a glance: one thin strip per
