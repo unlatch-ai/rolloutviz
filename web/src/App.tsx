@@ -264,8 +264,10 @@ function OverviewSteps({ trajectory, axis, selected, onSelect }: { trajectory: T
   </section>;
 }
 
-function AxisNavigator({ trajectory, axis, onChange }: { trajectory: Trajectory; axis: { start: number; end: number }; onChange: (axis: { start: number; end: number }) => void }) {
+function AxisNavigator({ trajectory, axis, selected, onChange }: { trajectory: Trajectory; axis: { start: number; end: number }; selected: number; onChange: (axis: { start: number; end: number }) => void }) {
   const drag = useRef<{ mode: "pan" | "start" | "end"; originX: number; start: number; end: number } | undefined>(undefined);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const width = useMeasuredWidth(mapRef);
   const min = trajectory.events[0]?.sequence ?? 0;
   const max = trajectory.events.at(-1)?.sequence ?? min + 1;
   const span = Math.max(1, max - min);
@@ -274,6 +276,7 @@ function AxisNavigator({ trajectory, axis, onChange }: { trajectory: Trajectory;
   const end = Math.max(start, Math.min(axis.end, max));
   const startPct = ((start - min) / span) * 100;
   const widthPct = Math.max(0.75, ((end - start) / span) * 100);
+  const layout = useMemo(() => layoutStrip(trajectory.events, { start: min, end: max }, width, { minSpacing: 3, binWidth: 3, preserveTools: true, preserveIndices: new Set([selected]) }), [max, min, selected, trajectory.events, width]);
   const sequenceAt = (clientX: number, rect: DOMRect) => min + Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width))) * span;
   const panTo = (center: number, width: number) => {
     const boundedWidth = Math.min(span, Math.max(minimumWindow, width));
@@ -281,7 +284,7 @@ function AxisNavigator({ trajectory, axis, onChange }: { trajectory: Trajectory;
     return { start: nextStart, end: nextStart + boundedWidth };
   };
   return <section className="axis-navigator" aria-label="Rollout timeline viewport" style={{ "--axis-start": `${startPct}%`, "--axis-width": `${widthPct}%` } as CSSProperties}>
-    <div className="axis-map" aria-label="Timeline overview" onPointerDown={(event) => {
+    <div ref={mapRef} className="axis-map" aria-label="Timeline overview" data-axis-mode={layout.mode} data-axis-nodes={layout.mode === "marks" ? layout.marks.length : layout.bins.filter((bin) => bin.count).length + layout.landmarks.length} onPointerDown={(event) => {
       if (event.button !== undefined && event.button !== 0) return;
       const rect = event.currentTarget.getBoundingClientRect();
       const x = event.clientX - rect.left;
@@ -321,7 +324,10 @@ function AxisNavigator({ trajectory, axis, onChange }: { trajectory: Trajectory;
       drag.current = undefined;
       event.currentTarget.closest<HTMLElement>("main")?.focus();
     }}>
-      {trajectory.events.map((event) => <i aria-hidden="true" key={event.id} className={`axis-mark ${event.kind}`} style={{ left: `${((event.sequence - min) / span) * 100}%` }} />)}
+      {layout.mode === "marks" ? layout.marks.map((mark) => <i aria-hidden="true" key={trajectory.events[mark.index].id} className={`axis-mark ${mark.kind} ${mark.index === selected ? "selected" : ""}`} style={{ left: mark.x }} />) : <>
+        {layout.bins.map((bin, index) => bin.count ? <i aria-hidden="true" key={`bin:${index}`} className={`axis-bin ${bin.tools * 2 > bin.count ? "tool-heavy" : ""}`} style={{ left: bin.x0, width: Math.max(1, bin.x1 - bin.x0), height: `${Math.max(2, Math.round((bin.count / layout.peak) * 9))}px` }} /> : null)}
+        {layout.landmarks.map((mark) => <i aria-hidden="true" key={trajectory.events[mark.index].id} className={`axis-mark ${mark.kind} ${mark.index === selected ? "selected" : ""}`} style={{ left: mark.x }} />)}
+      </>}
       <span className="axis-window"><i className="axis-handle start" /><i className="axis-handle end" /></span>
     </div>
     <input aria-label="Viewport start" type="range" min={min} max={max} step="any" value={start} onChange={(event) => onChange({ start: Math.min(Number(event.target.value), end - minimumWindow), end })} onPointerUp={(event) => event.currentTarget.closest<HTMLElement>("main")?.focus()} />
@@ -381,7 +387,7 @@ function LaneTrack({ lane, data, metadata, active, reference, hover, onActivate,
   return <main tabIndex={0} aria-label={lane.band === "focus" ? "Read trajectory" : `Context lane ${lane.trajectoryId}`} className={`lane-track depth-${depth} fidelity-${lane.fidelity} ${lane.band}-lane ${active ? "active-zone" : ""} ${reference ? "reference-lane" : ""}`} data-lane-id={lane.id} data-trajectory={lane.trajectoryId} data-depth={depth} data-stored-depth={lane.depth} data-fidelity={fidelityNames[lane.fidelity]} data-episode={episode?.key ?? ""} data-axis-start={lane.axis.start.toFixed(4)} data-axis-end={lane.axis.end.toFixed(4)} onFocus={onActivate} onClick={onActivate}>
     <header><span title={lane.trajectoryId}><b>{metadata?.title ?? lane.trajectoryId}</b>{metadata?.description && <small>{metadata.description}</small>}{reference && <small>reference</small>}</span><span className="lane-state">{["", "overview", "episodes", "events", "raw"][depth]}{depth === 1 ? ` · ${fidelityNames[lane.fidelity]} · [ ]` : ""}</span></header>
     <div className="lane-body">{!trajectory ? <div className="lane-loading">loading trajectory…</div> : depth === 1 ? <><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} fidelity={lane.fidelity} compact={lane.band === "context"} label={lane.band === "focus" ? "Trajectory shape" : `Trajectory shape ${lane.trajectoryId}`} onSelect={onSelect} onHover={onHover} />{lane.fidelity === 2 && lane.band === "focus" && <OverviewSteps trajectory={trajectory} axis={lane.axis} selected={selected} onSelect={onSelect} />}</> : depth === 2 ? <EpisodeStrip trajectory={trajectory} lane={lane} episodes={episodes} selectedEpisode={selectedEpisode} onDescend={(target) => onDescend(target)} /> : <><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} compact label="Compressed trajectory shape" onSelect={onSelect} onHover={onHover} onAscend={onAscend} />{depth === 3 && episode && <ScopedEvents trajectory={trajectory} episode={episode} selected={selected} onSelect={onSelect} />}{depth === 4 && trajectory.events[selected] && <SourceRecord event={trajectory.events[selected]} />}</>}</div>
-    {trajectory && <AxisNavigator trajectory={trajectory} axis={lane.axis} onChange={onAxisChange} />}
+    {trajectory && <AxisNavigator trajectory={trajectory} axis={lane.axis} selected={selected} onChange={onAxisChange} />}
     {trajectory && hover !== undefined && depth === 1 && lane.band === "focus" && <aside className="skim-preview" role="status"><b>#{trajectory.events[hover].sequence} · {trajectory.events[hover].kind}</b><span>{eventText(trajectory.events[hover])}</span></aside>}
   </main>;
 }

@@ -30,7 +30,7 @@ function fakeApi() {
     getPanel: vi.fn(() => undefined),
     onDidActivePanelChange: vi.fn((listener) => { activeListener = listener; return { dispose: activeDispose }; }),
     onDidLayoutChange: vi.fn((listener) => { layoutListener = listener; return { dispose: layoutDispose }; }),
-    toJSON: vi.fn(() => ({ grid: { root: { type: "leaf", data: { views: [] } } }, panels: {}, activeGroup: undefined })),
+    toJSON: vi.fn(() => ({ grid: { root: { type: "leaf", data: { views: [] as string[] } } }, panels: {}, activeGroup: undefined })),
   };
   return { api, activeDispose, layoutDispose, emitActive: (id: string) => activeListener?.({ panel: { id } }), emitLayout: () => layoutListener?.() };
 }
@@ -49,6 +49,8 @@ function renderDock(workspace: WorkspaceState, change = vi.fn()) {
 
 describe("useWorkspaceDock lifecycle", () => {
   afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
     dockMocks.focusElementForTarget.mockReset();
     dockMocks.reconcileDockPanels.mockReset();
     document.body.replaceChildren();
@@ -112,5 +114,30 @@ describe("useWorkspaceDock lifecycle", () => {
     });
     const update = view.change.mock.calls.at(-1)?.[0];
     expect(update?.(emptyWorkspace()).active).toBe("detail");
+  });
+
+  it("coalesces rapid layout geometry and persists only after the layout settles", () => {
+    vi.useFakeTimers();
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => { frames.push(callback); return frames.length; }));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const view = renderDock(emptyWorkspace());
+    const dock = fakeApi();
+    act(() => view.result.current.onReady({ api: dock.api } as never));
+    while (frames.length) act(() => frames.shift()!(0));
+    view.change.mockClear();
+    dock.api.toJSON.mockClear();
+    dock.api.toJSON.mockReturnValue({ grid: { root: { type: "leaf", data: { views: ["detail"] } } }, panels: {}, activeGroup: undefined });
+
+    act(() => { dock.emitLayout(); dock.emitLayout(); dock.emitLayout(); });
+    expect(frames).toHaveLength(2);
+    expect(view.change).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(139));
+    expect(view.change).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(view.change).toHaveBeenCalledTimes(1);
+    const persist = view.change.mock.calls[0][0];
+    persist(emptyWorkspace());
+    expect(dock.api.toJSON).toHaveBeenCalledTimes(1);
   });
 });

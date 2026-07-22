@@ -137,6 +137,16 @@ describe("layoutStrip (truth-first)", () => {
     expect(layout.bins.at(-1)!.x1).toBeCloseTo(300, 5);
   });
 
+  it("can preserve tools and the selected event while binning a dense overview", () => {
+    const events = Array.from({ length: 200 }, (_, index) => event(index * 0.5));
+    events[60] = event(30, "tool");
+    const layout = layoutStrip(events, window, 300, { preserveTools: true, preserveIndices: new Set([120]) });
+    expect(layout.mode).toBe("binned");
+    if (layout.mode !== "binned") return;
+    expect(layout.landmarks.map((mark) => mark.index)).toEqual([60, 120]);
+    expect(layout.bins.reduce((total, bin) => total + bin.count, 0)).toBe(198);
+  });
+
   it("marks mode is not entered when marks would collide", () => {
     const events = Array.from({ length: 100 }, (_, index) => event(index));
     expect(layoutStrip(events, { start: 0, end: 99 }, 300).mode).toBe("binned");

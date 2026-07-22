@@ -226,7 +226,7 @@ export function layoutStrip(
   events: TrajectoryEvent[],
   window: AxisWindow,
   widthPx: number,
-  options: { minSpacing?: number; binWidth?: number } = {},
+  options: { minSpacing?: number; binWidth?: number; preserveTools?: boolean; preserveIndices?: ReadonlySet<number> } = {},
 ): StripLayout {
   const minSpacing = options.minSpacing ?? 7;
   const binWidth = options.binWidth ?? 4;
@@ -244,7 +244,7 @@ export function layoutStrip(
   }));
   const landmarks: StripMark[] = [];
   for (const mark of visible) {
-    if (isLandmark(mark.kind)) { landmarks.push(mark); continue; }
+    if (isLandmark(mark.kind) || (options.preserveTools && mark.kind === "tool") || options.preserveIndices?.has(mark.index)) { landmarks.push(mark); continue; }
     const bin = bins[Math.min(binCount - 1, Math.floor((mark.x / width) * binCount))];
     bin.count += 1;
     if (mark.kind === "tool") bin.tools += 1;

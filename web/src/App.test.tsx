@@ -464,6 +464,25 @@ describe("instrument viewer", () => {
     expect(Number(lane.getAttribute("data-axis-end"))).toBeCloseTo(8.2);
   });
 
+  it("bins dense timeline marks while preserving exact tools, errors, and selection", async () => {
+    const trajectory = {
+      id: "dense-timeline",
+      events: Array.from({ length: 1000 }, (_, index) => ({
+        id: `event-${index}`,
+        sequence: index,
+        kind: index === 555 ? "error" : index % 100 === 0 ? "tool" : "message",
+      })),
+    };
+    render(<App initialTrajectory={trajectory} />);
+    fireEvent.keyDown(window, { key: "Enter" });
+    await screen.findByRole("main", { name: "Read trajectory" });
+    const timeline = screen.getByLabelText("Timeline overview");
+    expect(timeline).toHaveAttribute("data-axis-mode", "binned");
+    expect(Number(timeline.getAttribute("data-axis-nodes"))).toBeLessThan(500);
+    expect(timeline.querySelectorAll(".axis-mark.tool").length).toBeGreaterThan(0);
+    expect(timeline.querySelector(".axis-mark.error.selected")).toBeInTheDocument();
+  });
+
   it("opens a rollout-pinned detail module whose navigation acts on that rollout", async () => {
     await openRead();
     fireEvent.keyDown(window, { key: "d" });

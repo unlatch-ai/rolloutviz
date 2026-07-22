@@ -34,6 +34,9 @@ export function useWorkspaceDock({
   const tabPointerAt = useRef(0);
   const openingPinned = useRef<string | undefined>(undefined);
   const focusFrame = useRef<number | undefined>(undefined);
+  const geometryFrame = useRef<number | undefined>(undefined);
+  const persistenceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const persistedLayout = useRef<string | undefined>(workspace.layout ? JSON.stringify(workspace.layout) : undefined);
   const cleanup = useRef<(() => void)[]>([]);
   const [ready, setReady] = useState(false);
   const [detailPosition, setDetailPosition] = useState<"right" | "bottom">(workspace.direction === "columns" ? "bottom" : "right");
@@ -88,8 +91,34 @@ export function useWorkspaceDock({
 
   const persistLayout = useCallback((api = apiRef.current) => {
     if (!api || syncing.current || !api.totalPanels) return;
-    change((current) => ({ ...current, layout: api.toJSON() }), false);
+    const layout = api.toJSON();
+    const serialized = JSON.stringify(layout);
+    if (serialized === persistedLayout.current) return;
+    persistedLayout.current = serialized;
+    change((current) => ({ ...current, layout }), false);
   }, [change]);
+
+  const scheduleGeometry = useCallback((api: DockviewApi) => {
+    if (geometryFrame.current !== undefined) return;
+    geometryFrame.current = requestAnimationFrame(() => {
+      geometryFrame.current = undefined;
+      annotateGeometry(api);
+    });
+  }, [annotateGeometry]);
+
+  const schedulePersistence = useCallback((api: DockviewApi, delay = 140) => {
+    if (persistenceTimer.current !== undefined) clearTimeout(persistenceTimer.current);
+    persistenceTimer.current = setTimeout(() => {
+      persistenceTimer.current = undefined;
+      persistLayout(api);
+    }, delay);
+  }, [persistLayout]);
+
+  const flushPersistence = useCallback((api: DockviewApi) => {
+    if (persistenceTimer.current !== undefined) clearTimeout(persistenceTimer.current);
+    persistenceTimer.current = undefined;
+    persistLayout(api);
+  }, [persistLayout]);
 
   const reconcile = useCallback((api: DockviewApi) => {
     settling.current = true;
@@ -112,7 +141,11 @@ export function useWorkspaceDock({
   const disposeLifecycle = useCallback(() => {
     cleanup.current.splice(0).forEach((dispose) => dispose());
     if (focusFrame.current !== undefined) cancelAnimationFrame(focusFrame.current);
+    if (geometryFrame.current !== undefined) cancelAnimationFrame(geometryFrame.current);
+    if (persistenceTimer.current !== undefined) clearTimeout(persistenceTimer.current);
     focusFrame.current = undefined;
+    geometryFrame.current = undefined;
+    persistenceTimer.current = undefined;
   }, []);
 
   const onReady = useCallback((event: DockviewReadyEvent) => {
@@ -125,6 +158,7 @@ export function useWorkspaceDock({
       catch { api.clear(); }
     }
     syncing.current = false;
+    persistedLayout.current = workspaceRef.current.layout ? JSON.stringify(workspaceRef.current.layout) : undefined;
 
     const activeDisposable = api.onDidActivePanelChange(({ panel }) => {
       if (syncing.current || !panel || Date.now() - tabPointerAt.current > 400) return;
@@ -136,8 +170,8 @@ export function useWorkspaceDock({
     };
     document.addEventListener("pointerdown", onTabPointer, true);
     const layoutDisposable = api.onDidLayoutChange(() => {
-      annotateGeometry(api);
-      persistLayout(api);
+      scheduleGeometry(api);
+      schedulePersistence(api);
       scheduleFocus(workspaceRef.current.active, true);
     });
     cleanup.current.push(
@@ -148,7 +182,7 @@ export function useWorkspaceDock({
     reconcile(api);
     document.querySelectorAll(".dv-live-region, .dv-live-region-assertive").forEach((node) => node.removeAttribute("role"));
     setReady(true);
-  }, [annotateGeometry, change, disposeLifecycle, persistLayout, reconcile, scheduleFocus, workspaceRef]);
+  }, [change, disposeLifecycle, reconcile, scheduleFocus, scheduleGeometry, schedulePersistence, workspaceRef]);
 
   useEffect(() => () => {
     disposeLifecycle();
@@ -185,8 +219,8 @@ export function useWorkspaceDock({
     if (!api || !detail || !center || detail.id === center.id) return;
     detail.api.moveTo({ group: center.api.group, position });
     setDetailPosition(position);
-    requestAnimationFrame(() => persistLayout(api));
-  }, [persistLayout, workspaceRef]);
+    requestAnimationFrame(() => flushPersistence(api));
+  }, [flushPersistence, workspaceRef]);
 
   const arrangeLanes = useCallback((direction: "rows" | "columns") => {
     change((current) => ({ ...current, direction }));
@@ -196,9 +230,9 @@ export function useWorkspaceDock({
       const panels = workspaceRef.current.lanes.map((lane) => api.getPanel(lanePanelId(lane.id))).filter((panel): panel is NonNullable<typeof panel> => !!panel);
       for (let index = 1; index < panels.length; index++) panels[index].api.moveTo({ group: panels[index - 1].api.group, position: direction === "rows" ? "bottom" : "right" });
       dockDetail(direction === "rows" ? "right" : "bottom");
-      requestAnimationFrame(() => persistLayout(api));
+      requestAnimationFrame(() => flushPersistence(api));
     });
-  }, [change, dockDetail, persistLayout, workspaceRef]);
+  }, [change, dockDetail, flushPersistence, workspaceRef]);
 
   const moveActiveModule = useCallback((key: string) => {
     const api = apiRef.current;
@@ -211,8 +245,8 @@ export function useWorkspaceDock({
     const position: Position = key === "ArrowLeft" ? "left" : key === "ArrowRight" ? "right" : key === "ArrowDown" ? "bottom" : "top";
     panel.api.moveTo({ group: center.api.group, position });
     if (panel.id === "detail") setDetailPosition(position === "bottom" ? "bottom" : "right");
-    requestAnimationFrame(() => persistLayout(api));
-  }, [persistLayout, workspaceRef]);
+    requestAnimationFrame(() => flushPersistence(api));
+  }, [flushPersistence, workspaceRef]);
 
   const resizeNearest = useCallback((key: string) => {
     const api = apiRef.current;
@@ -223,7 +257,8 @@ export function useWorkspaceDock({
     const delta = key === "ArrowRight" || key === "ArrowDown" ? 24 : -24;
     if (singleLane || key === "ArrowLeft" || key === "ArrowRight") panel.api.group.api.setSize({ width: Math.max(120, box.width + delta) });
     else panel.api.group.api.setSize({ height: Math.max(72, box.height + delta) });
-  }, [workspaceRef]);
+    if (api) requestAnimationFrame(() => flushPersistence(api));
+  }, [flushPersistence, workspaceRef]);
 
   const activateTarget = useCallback((target: string) => {
     apiRef.current?.getPanel(panelIdForTarget(target))?.api.setActive();
