@@ -793,7 +793,7 @@ func printVersion(jsonOutput bool) {
 func printHelp() {
 	fmt.Print(`RLViz
 
-Visualize and compare agent rollouts.
+Inspect agent rollouts locally.
 
 Usage:
   rlviz init [--yes]

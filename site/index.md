@@ -1,33 +1,63 @@
-# RLViz
+# RLViz documentation
 
-Visualize and compare agent rollouts locally.
+RLViz is an open-source viewer for agent rollouts. It reads existing trace
+files, normalizes them into a small event model, and lets you inspect or compare
+what the model, tools, grader, and environment did.
 
-RLViz opens canonical trajectories, rollout cohorts, and trusted adapter output in a keyboard-first browser UI or TUI. It reads sources without mutating them and makes no outbound requests during viewing.
+The browser viewer runs entirely in the tab. The CLI handles larger files,
+private formats, growing traces, and local adapters. Neither path requires an
+account or changes the source trace.
 
-Open a local trace without installing anything at [app.rlviz.dev](https://app.rlviz.dev). Your trace is parsed in that tab and never uploaded.
+## Start here
 
-## Install
+- [Open the browser viewer](https://rlviz.dev/) for canonical NDJSON, Inspect AI
+  EvalLog JSON, or Verifiers GenerateOutputs JSON up to 32 MiB.
+- Read [onboarding](onboarding.html) for installation and the first local trace.
+- Check [supported formats](supported-formats.html)
+  before writing an adapter.
+- Use [adapter authoring](adapter-authoring.html) for a private or unsupported
+  trace format.
+
+## Install the CLI
 
 ```bash
-curl -fsSL https://rlviz.dev/install.sh | sh
-```
-
-Or through a package manager:
-
-```bash
-npm install -g rlviz
 brew install TheSnakeFang/tap/rlviz
 ```
 
-Installation and setup documentation: [rlviz.dev/onboarding.html](https://rlviz.dev/onboarding.html).
-
-## 30-second quickstart
+The same native binary is available through npm or the verified shell
+installer:
 
 ```bash
-rlviz init
-rlviz demo
+npm install --global rlviz
+curl -fsSL https://rlviz.dev/install.sh | sh
+```
+
+Then inspect and open a trace:
+
+```bash
 rlviz inspect ./path/to/rollout.ndjson
 rlviz open ./path/to/rollout.ndjson
 ```
 
-If `inspect` reports an unsupported format, scaffold a project-local adapter, review it, and explicitly trust it before execution. The [adapter authoring guide](https://rlviz.dev/adapter-authoring.html) covers that boundary.
+`inspect` probes the file without launching the viewer. `open` starts a
+loopback-only daemon, builds a removable local index, opens the browser, and
+returns immediately.
+
+## What is different
+
+- **Existing traces, not an instrumentation SDK.** Point RLViz at stored files
+  from a run that already happened.
+- **Local by default.** Browser parsing stays in the tab. CLI viewing stays on
+  loopback and makes no outbound requests.
+- **Source-read-only.** Normalized events retain provenance back to raw records;
+  titles, descriptions, layouts, and other presentation state remain local.
+- **One rollout or a collection.** Read steps at adjustable fidelity, group
+  trials, arrange multiple rollouts as rows, pin detail views, and compare
+  trajectories around behavioral anchors.
+- **Formats stay outside the viewer.** Built-in decoders and explicit local
+  adapters map source data into the same canonical records.
+
+## Boundaries
+
+RLViz does not run agents, execute recorded tools, train models, manage prompts,
+or provide hosted monitoring. It is an inspection and comparison tool.

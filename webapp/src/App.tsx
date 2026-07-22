@@ -108,12 +108,12 @@ export function BrowserApp() {
   return <div className={`browser-app ${provider ? "viewer-open" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); void openFile(event.dataTransfer.files[0]); }}>
     {picker}
     {!provider ? <main className={`landing ${dragging ? "dragging" : ""}`}>
-      <nav><a className="wordmark" href="https://rlviz.dev">RLViz</a><button onClick={() => setHelp(true)}>adapter help</button></nav>
+      <nav><a className="wordmark" href="/">RLViz</a><div className="landing-links"><a href="/docs.html">docs</a><a href="https://github.com/TheSnakeFang/rlviz">GitHub</a><button onClick={() => setHelp(true)}>adapter help</button></div></nav>
       <section className="hero">
         <p className="kicker">Browser viewer · local files only</p>
-        <h1>Open the trace. Keep the trace.</h1>
-        <p className="privacy">Your trace is parsed in this tab and never uploaded.</p>
-        <p className="support">Canonical NDJSON, Inspect AI EvalLog JSON, and Verifiers GenerateOutputs JSON run fully client-side through the same Go core as the CLI.</p>
+        <h1>Inspect agent rollouts locally.</h1>
+        <p className="privacy">Read events, compare trajectories, and trace failures without uploading the source.</p>
+        <p className="support">Canonical NDJSON, Inspect AI EvalLog JSON, and Verifiers GenerateOutputs JSON are parsed in this tab through the same Go core as the CLI.</p>
         <div className="primary-actions"><button className="primary" disabled={busy} onClick={() => traceInput.current?.click()}>{busy ? "parsing…" : "open a local trace"}</button><span>or drag it anywhere onto this page</span></div>
         <div className="example-actions"><span>load example</span>{examples.map(([label, name, url]) => <button key={name} disabled={busy} onClick={() => void openExample(url, name)}>{label}</button>)}</div>
         <p className="status" role="status">{status}</p>
@@ -124,7 +124,7 @@ export function BrowserApp() {
       <header className="viewer-bar"><div><b>RLViz browser viewer</b><span>{status}</span></div><div><button onClick={() => traceInput.current?.click()}>open another trace</button><button onClick={() => adapterInput.current?.click()}>WASM adapter</button><button onClick={() => setHelp(true)}>adapter help</button></div></header>
       <Suspense fallback={<div className="viewer-loading" role="status">loading viewer…</div>}><Viewer provider={provider} /></Suspense>
     </>}
-    <footer className="browser-footer"><a href="https://rlviz.dev">docs at rlviz.dev</a><span>private formats and big cohorts: <code>brew install TheSnakeFang/tap/rlviz</code></span></footer>
+    <footer className="browser-footer"><a href="/docs.html">documentation</a><span>private formats and larger cohorts: <code>brew install TheSnakeFang/tap/rlviz</code></span></footer>
     {help && <div className="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="adapter-help-title"><section><header><h2 id="adapter-help-title">Ask your local coding agent</h2><button onClick={() => setHelp(false)}>close</button></header><p>This prompt defines the complete browser adapter contract. The app does not send it or your trace anywhere.</p><pre>{adapterPrompt}</pre><button onClick={() => void navigator.clipboard.writeText(adapterPrompt)}>copy prompt</button></section></div>}
     {pendingAdapter && <div className="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="adapter-confirm-title"><section><header><h2 id="adapter-confirm-title">Confirm browser adapter</h2><button onClick={() => setPendingAdapter(undefined)}>cancel</button></header><p>This module can compute inside the browser sandbox. It receives the current trace bytes and is not persisted.</p><dl><dt>module</dt><dd>{pendingAdapter.name}</dd><dt>size</dt><dd>{pendingAdapter.size.toLocaleString()} bytes</dd><dt>SHA-256</dt><dd><code>{pendingAdapter.digest}</code></dd></dl><button className="primary" disabled={!source} onClick={() => void confirmAdapter()}>{source ? "confirm and run once" : "open a trace first"}</button></section></div>}
   </div>;

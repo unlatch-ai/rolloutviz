@@ -23,7 +23,7 @@ work, and `later` is an intended capability without a committed release.
 | Configure the viewer | Complete first-run setup and edit layout, theme, fidelity, and keybindings in one documented config | next |
 | Inspect alignment in context | Overlay aligned reference events and divergence evidence directly on rollout lanes | next |
 | Hand work to an agent | Generate a local workbook that gives a coding agent bounded trace context and explicit tasks | next |
-| Use one public surface | Read the short product explanation, install, open a trace, and continue into the viewer on `rlviz.dev` | next |
+| Use one public surface | Read the short product explanation, install, open a trace, and continue into the viewer on `rlviz.dev` | current |
 
 ## Feature areas
 
@@ -79,8 +79,7 @@ work, and `later` is an intended capability without a committed release.
 
 - `current` CLI daemon viewer and zero-upload WebAssembly browser viewer sharing one instrument UI.
 - `current` Light/dark themes, presentation palettes, semantic glyphs, and accessible text equivalents.
-- `current` Favicon, social preview, and plain metadata that describe the product without marketing claims.
-- `next` One-site transition at `rlviz.dev` and an external-user docs rewrite.
+- `current` One public surface at `rlviz.dev`, external-user documentation, and plain metadata with a product-specific favicon and social preview.
 - `next` Agent-readable workbooks and setup instructions.
 
 ## Product boundaries

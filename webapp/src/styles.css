@@ -7,6 +7,8 @@
 .landing.dragging { box-shadow: inset 0 0 0 3px var(--ctx); }
 .landing nav, .viewer-bar { display: flex; align-items: center; justify-content: space-between; min-height: 64px; border-bottom: 1px solid var(--hairline); }
 .wordmark { color: var(--ink); font-weight: 750; text-decoration: none; }
+.landing-links { display: flex; align-items: center; gap: 16px; }
+.landing-links a { color: var(--ink-secondary); font-size: 12px; }
 .landing nav button, .viewer-bar button, .example-actions button, .adapter-callout button { padding: 7px 10px; }
 .hero { max-width: 920px; margin: 0 auto; padding: 14vh 0 10vh; }
 .kicker { margin: 0 0 18px; color: var(--ink-secondary); font: 11px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }

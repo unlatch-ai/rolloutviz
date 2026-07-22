@@ -20,13 +20,12 @@ type page struct {
 }
 
 var pages = []page{
-	{Title: "Overview", Description: "Install RLViz and open a rollout in the local viewer.", Source: "site/index.md", Output: "index.html"},
-	{Title: "README", Description: "Repository overview, commands, installation options, and contributor entry points.", Source: "README.md", Output: "readme.html"},
-	{Title: "Product spec", Description: "Product scope, users, core concepts, and expected behavior.", Source: "docs/product-spec.md", Output: "product-spec.html"},
-	{Title: "Interaction spec", Description: "Keyboard-first interaction model and visual semantics for the browser and TUI.", Source: "docs/interaction-spec.md", Output: "interaction-spec.html"},
-	{Title: "Onboarding", Description: "Setup, diagnostics, format inspection, and first-run workflows.", Source: "docs/onboarding.md", Output: "onboarding.html"},
+	{Title: "Docs", Description: "Install RLViz, open a trace, and understand the product boundary.", Source: "site/index.md", Output: "docs.html"},
+	{Title: "Quickstart", Description: "Install RLViz and open a browser, terminal, or private-format trace.", Source: "docs/onboarding.md", Output: "onboarding.html"},
+	{Title: "Formats", Description: "Formats RLViz opens directly and the boundary for local adapters.", Source: "docs/supported-formats.md", Output: "supported-formats.html"},
 	{Title: "Adapter authoring", Description: "Safe workflow for building, trusting, validating, and using source adapters.", Source: "docs/adapter-authoring.md", Output: "adapter-authoring.html"},
-	{Title: "Data model", Description: "Canonical records emitted by built-in and user-authored adapters.", Source: "docs/data-model.md", Output: "data-model.html"},
+	{Title: "Canonical model", Description: "Canonical records emitted by built-in and user-authored adapters.", Source: "docs/data-model.md", Output: "data-model.html"},
+	{Title: "FAQ", Description: "Privacy, source handling, scale, formats, and product boundaries.", Source: "docs/faq.md", Output: "faq.html"},
 }
 
 const siteURL = "https://rlviz.dev"
@@ -75,13 +74,23 @@ func build(output string) error {
 	if err != nil {
 		return fmt.Errorf("read Vercel config for site: %w", err)
 	}
+	favicon, err := os.ReadFile("webapp/public/favicon.svg")
+	if err != nil {
+		return fmt.Errorf("read favicon for site: %w", err)
+	}
+	socialPreview, err := os.ReadFile("webapp/public/rlviz-social.png")
+	if err != nil {
+		return fmt.Errorf("read social preview for site: %w", err)
+	}
 	artifacts := map[string][]byte{
-		"install.sh":    installer,
-		"CNAME":         []byte("rlviz.dev"),
-		"llms.txt":      []byte(llmsManifest()),
-		"llms-full.txt": []byte(llmsFull(contents)),
-		"style.css":     []byte(styles),
-		"vercel.json":   vercelConfig,
+		"install.sh":       installer,
+		"CNAME":            []byte("rlviz.dev"),
+		"favicon.svg":      favicon,
+		"llms.txt":         []byte(llmsManifest()),
+		"llms-full.txt":    []byte(llmsFull(contents)),
+		"rlviz-social.png": socialPreview,
+		"style.css":        []byte(styles),
+		"vercel.json":      vercelConfig,
 	}
 	for name, content := range artifacts {
 		if err := os.WriteFile(filepath.Join(output, name), content, 0o644); err != nil {
@@ -134,13 +143,16 @@ func layout(current page, body string) string {
 		}
 		fmt.Fprintf(&navigation, `<a href="%s"%s>%s</a>`, candidate.Output, class, html.EscapeString(candidate.Title))
 	}
-	navigation.WriteString(`<a class="viewer-link" href="https://app.rlviz.dev">Open the viewer → app.rlviz.dev</a>`)
-	return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"color-scheme\" content=\"dark\"><title>" + html.EscapeString(current.Title) + " · RLViz</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><aside><a class=\"brand\" href=\"index.html\"><b>RLViz</b></a><nav>" + navigation.String() + "</nav><footer>local-first · source-read-only</footer></aside><main>" + body + "</main></body></html>"
+	navigation.WriteString(`<a class="viewer-link" href="/">Open the viewer</a>`)
+	title := current.Title + " · RLViz"
+	canonical := siteURL + "/" + current.Output
+	description := html.EscapeString(current.Description)
+	return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"color-scheme\" content=\"dark\"><meta name=\"theme-color\" content=\"#111519\"><meta name=\"description\" content=\"" + description + "\"><meta property=\"og:type\" content=\"article\"><meta property=\"og:site_name\" content=\"RLViz\"><meta property=\"og:title\" content=\"" + html.EscapeString(title) + "\"><meta property=\"og:description\" content=\"" + description + "\"><meta property=\"og:url\" content=\"" + canonical + "\"><meta property=\"og:image\" content=\"" + siteURL + "/rlviz-social.png\"><meta property=\"og:image:width\" content=\"1200\"><meta property=\"og:image:height\" content=\"630\"><meta property=\"og:image:alt\" content=\"Three agent trajectory timelines with a selected viewport and event detail panel\"><meta name=\"twitter:card\" content=\"summary_large_image\"><meta name=\"twitter:title\" content=\"" + html.EscapeString(title) + "\"><meta name=\"twitter:description\" content=\"" + description + "\"><meta name=\"twitter:image\" content=\"" + siteURL + "/rlviz-social.png\"><meta name=\"twitter:image:alt\" content=\"Three agent trajectory timelines with a selected viewport and event detail panel\"><link rel=\"canonical\" href=\"" + canonical + "\"><link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\"><title>" + html.EscapeString(title) + "</title><link rel=\"stylesheet\" href=\"/style.css\"></head><body><aside><a class=\"brand\" href=\"/\"><b>RLViz</b></a><nav>" + navigation.String() + "</nav><footer>local-first · source-read-only</footer></aside><main>" + body + "</main></body></html>"
 }
 
 func markdown(source []byte) string {
 	scanner := bufio.NewScanner(bytes.NewReader(source))
-	var output, paragraph strings.Builder
+	var output, paragraph, listItem strings.Builder
 	inCode, inList, inQuote := false, false, false
 	codeLanguage := ""
 	flushParagraph := func() {
@@ -149,9 +161,16 @@ func markdown(source []byte) string {
 			paragraph.Reset()
 		}
 	}
+	flushListItem := func() {
+		if listItem.Len() > 0 {
+			fmt.Fprintf(&output, "<li>%s</li>", inline(strings.TrimSpace(listItem.String())))
+			listItem.Reset()
+		}
+	}
 	closeBlocks := func() {
 		flushParagraph()
 		if inList {
+			flushListItem()
 			output.WriteString("</ul>")
 			inList = false
 		}
@@ -193,12 +212,14 @@ func markdown(source []byte) string {
 			if !inList {
 				output.WriteString("<ul>")
 				inList = true
+			} else {
+				flushListItem()
 			}
 			item := strings.TrimSpace(line[2:])
 			if orderedItem(line) {
 				item = strings.TrimSpace(line[strings.Index(line, ".")+1:])
 			}
-			fmt.Fprintf(&output, "<li>%s</li>", inline(item))
+			listItem.WriteString(item)
 			continue
 		}
 		if strings.HasPrefix(line, "> ") {
@@ -213,6 +234,11 @@ func markdown(source []byte) string {
 		if strings.HasPrefix(strings.TrimSpace(line), "|") {
 			closeBlocks()
 			fmt.Fprintf(&output, "<pre class=\"table\">%s</pre>", html.EscapeString(line))
+			continue
+		}
+		if inList {
+			listItem.WriteByte(' ')
+			listItem.WriteString(strings.TrimSpace(line))
 			continue
 		}
 		if paragraph.Len() > 0 {
@@ -253,6 +279,7 @@ func orderedItem(line string) bool {
 
 var linkPattern = regexp.MustCompile(`\[([^]]+)\]\(([^)]+)\)`)
 var codePattern = regexp.MustCompile("`([^`]+)`")
+var strongPattern = regexp.MustCompile(`\*\*([^*]+)\*\*`)
 
 func inline(value string) string {
 	escaped := html.EscapeString(value)
@@ -264,6 +291,7 @@ func inline(value string) string {
 		return `<a href="` + parts[2] + `">` + parts[1] + `</a>`
 	})
 	escaped = codePattern.ReplaceAllString(escaped, `<code>$1</code>`)
+	escaped = strongPattern.ReplaceAllString(escaped, `<strong>$1</strong>`)
 	return escaped
 }
 

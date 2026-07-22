@@ -21,7 +21,8 @@ test("bundled example stays local and walks Browse to Read", async ({ page }) =>
   });
 
   await page.goto("/");
-  await expect(page.getByText("Your trace is parsed in this tab and never uploaded.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Inspect agent rollouts locally." })).toBeVisible();
+  await expect(page.getByText("zero upload", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "300-event coding trace" }).click();
 
   await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible({ timeout: 15_000 });
