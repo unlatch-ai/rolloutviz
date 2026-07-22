@@ -22,11 +22,10 @@ repository variable `NPM_PUBLISH_ENABLED` enables the job. Recovery and
 re-bootstrap steps live in
 [`packages/npm/README.md`](../packages/npm/README.md).
 
-### Documentation
+### Public site
 
-The documentation site is hosted on Vercel at `rlviz.dev`, not GitHub Pages.
-Generate it locally and deploy the generated directory from the repository
-root:
+The browser viewer and external documentation are one static deployment at
+`rlviz.dev`. Generate it locally and deploy from the repository root:
 
 ```bash
 make site
@@ -36,21 +35,21 @@ vercel deploy site/dist
 The generated `CNAME` file is harmless static output; Vercel project and domain
 configuration remain the deployment source of truth.
 
-Pushes to `main` deploy both static surfaces through
-`.github/workflows/deploy.yml`. Configure these GitHub Actions settings before
-enabling deployment:
+Pushes to `main` deploy that public surface and a permanent redirect from the
+former `app.rlviz.dev` project through `.github/workflows/deploy.yml`. Configure
+these GitHub Actions settings before enabling deployment:
 
 | Kind | Name | Value |
 | --- | --- | --- |
 | Secret | `VERCEL_TOKEN` | Vercel access token authorized for the team and both projects |
 | Variable | `VERCEL_ORG_ID` | `team_Ne0q1qtstphdUEi4nvQYFluC` |
-| Variable | `VERCEL_PROJECT_ID_DOCS` | Project ID for `rlviz` (`rlviz.dev`) |
-| Variable | `VERCEL_PROJECT_ID_APP` | Project ID for `rlviz-app` (`app.rlviz.dev`) |
+| Variable | `VERCEL_PROJECT_ID_DOCS` | Project ID for the viewer and docs (`rlviz.dev`) |
+| Variable | `VERCEL_PROJECT_ID_APP` | Project ID for the redirect (`app.rlviz.dev`) |
 
 The workflow fails before building if any setting is empty. It reads the Go
-toolchain version from `go.mod`, builds `site/dist` and `webapp/dist` (including
-the Go WebAssembly core), and deploys each directory to its own project. Forks
-emit a notice and do not deploy.
+toolchain version from `go.mod`, builds `site/dist` with the Go WebAssembly core,
+viewer, documentation, metadata, and public assets, then deploys the redirect.
+Forks emit a notice and do not deploy.
 
 ## Publish
 

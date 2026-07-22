@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TheSnakeFang/rlviz/internal/shape"
+
 	"github.com/TheSnakeFang/rlviz/internal/model"
 	"github.com/TheSnakeFang/rlviz/internal/presentation"
 )
@@ -279,6 +281,40 @@ func (i *Index) FirstTrajectory(ctx context.Context, sourceID string) (IndexedRe
 		return IndexedRecord[*model.Trajectory]{}, ErrNotFound
 	}
 	return page.Items[0], nil
+}
+
+// TrajectoryShapeEvents returns the minimal event columns required for truthful
+// collection-strip summaries. It deliberately never reads canonical raw blobs.
+func (i *Index) TrajectoryShapeEvents(ctx context.Context, sourceID string, trajectoryIDs []string) (map[string][]shape.Event, error) {
+	result := make(map[string][]shape.Event, len(trajectoryIDs))
+	if len(trajectoryIDs) == 0 {
+		return result, nil
+	}
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(trajectoryIDs)), ",")
+	args := make([]any, 0, len(trajectoryIDs)+1)
+	args = append(args, sourceID)
+	for _, trajectoryID := range trajectoryIDs {
+		args = append(args, trajectoryID)
+		result[trajectoryID] = []shape.Event{}
+	}
+	rows, err := i.db.QueryContext(ctx, `SELECT trajectory_id,sequence,kind,alignment_key,context_present
+	    FROM events WHERE source_id=? AND trajectory_id IN (`+placeholders+`) ORDER BY trajectory_id,sequence`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query trajectory shape events: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var trajectoryID string
+		var event shape.Event
+		if err := rows.Scan(&trajectoryID, &event.Sequence, &event.Kind, &event.AlignmentKey, &event.HasContext); err != nil {
+			return nil, err
+		}
+		result[trajectoryID] = append(result[trajectoryID], event)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (i *Index) Events(ctx context.Context, query EventQuery) (EventPage, error) {

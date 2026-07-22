@@ -1,14 +1,13 @@
-import { useCallback, useRef, useState } from "react";
-import { App as Viewer } from "../../web/src/App";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import type { ViewerProvider } from "../../web/src/provider";
-import codingExample from "../../examples/gallery/coding-agent-bugfix.ndjson?raw";
-import researchExample from "../../examples/gallery/web-research-agent.ndjson?raw";
-import cohortExample from "../../examples/gallery/checkout-cohort.ndjson?raw";
+import codingExample from "../../examples/gallery/coding-agent-bugfix.ndjson?url";
+import researchExample from "../../examples/gallery/web-research-agent.ndjson?url";
+import cohortExample from "../../examples/gallery/checkout-cohort.ndjson?url";
 import { adapterIdentity, runAdapter } from "./adapter";
 import { createInMemoryProvider } from "./provider";
 import { limits, parseTrace } from "./wasm";
 
-const encoder = new TextEncoder();
+const Viewer = lazy(() => import("../../web/src/App").then(({ App }) => ({ default: App })));
 const examples = [
   ["300-event coding trace", "coding-agent-bugfix.ndjson", codingExample],
   ["web research trace", "web-research-agent.ndjson", researchExample],
@@ -69,6 +68,18 @@ export function BrowserApp() {
     await openBytes(new Uint8Array(await file.arrayBuffer()), file.name);
   };
 
+  const openExample = async (url: string, name: string) => {
+    setBusy(true); setStatus(`Loading ${name}…`);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Could not load ${name}`);
+      await openBytes(new Uint8Array(await response.arrayBuffer()), name);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : `Could not load ${name}`);
+      setBusy(false);
+    }
+  };
+
   const chooseAdapter = async (file?: File) => {
     if (!file) return;
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -94,26 +105,26 @@ export function BrowserApp() {
     <input ref={adapterInput} hidden type="file" accept=".wasm,application/wasm" onChange={(event) => void chooseAdapter(event.target.files?.[0])} />
   </>;
 
-  return <div className="browser-app" onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); void openFile(event.dataTransfer.files[0]); }}>
+  return <div className={`browser-app ${provider ? "viewer-open" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); void openFile(event.dataTransfer.files[0]); }}>
     {picker}
     {!provider ? <main className={`landing ${dragging ? "dragging" : ""}`}>
-      <nav><a className="wordmark" href="https://rlviz.dev">RLViz</a><button onClick={() => setHelp(true)}>adapter help</button></nav>
+      <nav><a className="wordmark" href="/">RLViz</a><div className="landing-links"><a href="/docs.html">docs</a><a href="https://github.com/TheSnakeFang/rlviz">GitHub</a><button onClick={() => setHelp(true)}>adapter help</button></div></nav>
       <section className="hero">
         <p className="kicker">Browser viewer · local files only</p>
-        <h1>Open the trace. Keep the trace.</h1>
-        <p className="privacy">Your trace is parsed in this tab and never uploaded.</p>
-        <p className="support">Canonical NDJSON, Inspect AI EvalLog JSON, and Verifiers GenerateOutputs JSON run fully client-side through the same Go core as the CLI.</p>
+        <h1>Inspect agent rollouts locally.</h1>
+        <p className="privacy">Read events, compare trajectories, and trace failures without uploading the source.</p>
+        <p className="support">Canonical NDJSON, Inspect AI EvalLog JSON, and Verifiers GenerateOutputs JSON are parsed in this tab through the same Go core as the CLI.</p>
         <div className="primary-actions"><button className="primary" disabled={busy} onClick={() => traceInput.current?.click()}>{busy ? "parsing…" : "open a local trace"}</button><span>or drag it anywhere onto this page</span></div>
-        <div className="example-actions"><span>load example</span>{examples.map(([label, name, value]) => <button key={name} disabled={busy} onClick={() => void openBytes(encoder.encode(value), name)}>{label}</button>)}</div>
+        <div className="example-actions"><span>load example</span>{examples.map(([label, name, url]) => <button key={name} disabled={busy} onClick={() => void openExample(url, name)}>{label}</button>)}</div>
         <p className="status" role="status">{status}</p>
         {source && <div className="adapter-callout"><p>This format needs an adapter. The module runs in the browser sandbox after you confirm its digest.</p><button onClick={() => adapterInput.current?.click()}>upload WASM adapter</button><button onClick={() => setHelp(true)}>show adapter prompt</button></div>}
       </section>
-      <section className="privacy-proof" aria-label="Privacy guarantees"><div><b>zero upload</b><span>File and adapter APIs read local bytes directly.</span></div><div><b>in-memory index</b><span>No SQLite, account, cache, or server is involved.</span></div><div><b>static app</b><span>No CDN dependencies or trace-data requests.</span></div></section>
+      <section className="privacy-proof" aria-label="Privacy guarantees"><div><b>zero upload</b><span>File and adapter APIs read local bytes directly.</span></div><div><b>in-memory index</b><span>No SQLite, account, cache, or server is involved.</span></div><div><b>static app</b><span>No CDN dependencies. Opened trace bytes never leave the tab.</span></div></section>
     </main> : <>
       <header className="viewer-bar"><div><b>RLViz browser viewer</b><span>{status}</span></div><div><button onClick={() => traceInput.current?.click()}>open another trace</button><button onClick={() => adapterInput.current?.click()}>WASM adapter</button><button onClick={() => setHelp(true)}>adapter help</button></div></header>
-      <Viewer provider={provider} />
+      <Suspense fallback={<div className="viewer-loading" role="status">loading viewer…</div>}><Viewer provider={provider} /></Suspense>
     </>}
-    <footer className="browser-footer"><a href="https://rlviz.dev">docs at rlviz.dev</a><span>private formats and big cohorts: <code>brew install TheSnakeFang/tap/rlviz</code></span></footer>
+    <footer className="browser-footer"><a href="/docs.html">documentation</a><span>private formats and larger cohorts: <code>brew install TheSnakeFang/tap/rlviz</code></span></footer>
     {help && <div className="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="adapter-help-title"><section><header><h2 id="adapter-help-title">Ask your local coding agent</h2><button onClick={() => setHelp(false)}>close</button></header><p>This prompt defines the complete browser adapter contract. The app does not send it or your trace anywhere.</p><pre>{adapterPrompt}</pre><button onClick={() => void navigator.clipboard.writeText(adapterPrompt)}>copy prompt</button></section></div>}
     {pendingAdapter && <div className="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="adapter-confirm-title"><section><header><h2 id="adapter-confirm-title">Confirm browser adapter</h2><button onClick={() => setPendingAdapter(undefined)}>cancel</button></header><p>This module can compute inside the browser sandbox. It receives the current trace bytes and is not persisted.</p><dl><dt>module</dt><dd>{pendingAdapter.name}</dd><dt>size</dt><dd>{pendingAdapter.size.toLocaleString()} bytes</dd><dt>SHA-256</dt><dd><code>{pendingAdapter.digest}</code></dd></dl><button className="primary" disabled={!source} onClick={() => void confirmAdapter()}>{source ? "confirm and run once" : "open a trace first"}</button></section></div>}
   </div>;

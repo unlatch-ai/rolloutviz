@@ -225,7 +225,7 @@ invalidates trust, even when the manifest version is unchanged.
 
 ## Browser adapters
 
-The static viewer at [app.rlviz.dev](https://app.rlviz.dev) can run a
+The static viewer at [rlviz.dev](https://rlviz.dev) can run a
 user-supplied WebAssembly adapter without sending the adapter or trace to a
 server. Browser adapters are session-only: the user selects the module, reviews
 its byte size and SHA-256 digest, and confirms that exact module before its

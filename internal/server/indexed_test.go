@@ -15,6 +15,7 @@ import (
 
 	rolloutindex "github.com/TheSnakeFang/rlviz/internal/index"
 	"github.com/TheSnakeFang/rlviz/internal/model"
+	"github.com/TheSnakeFang/rlviz/internal/shape"
 )
 
 func testIndexedHandler(t *testing.T) http.Handler {
@@ -131,6 +132,10 @@ func TestIndexedBrowseReturnsTheKnownCollection(t *testing.T) {
 	if _, duplicated := first["metrics"].(map[string]any)["trajectory"]; duplicated {
 		t.Fatalf("browse metrics duplicate the trajectory: %#v", first["metrics"])
 	}
+	shape, ok := first["shape"].(map[string]any)
+	if !ok || shape["events"] == float64(0) || len(shape["slots"].([]any)) != 48 {
+		t.Fatalf("first shape=%#v", first["shape"])
+	}
 }
 
 type browseTestReader struct {
@@ -138,6 +143,7 @@ type browseTestReader struct {
 	groups       []rolloutindex.IndexedRecord[*model.Group]
 	pages        map[string][]rolloutindex.TrajectorySummary
 	contextCalls int
+	shapeCalls   int
 }
 
 func (reader *browseTestReader) Sources(context.Context) ([]rolloutindex.SourceInfo, error) {
@@ -153,6 +159,15 @@ func (reader *browseTestReader) GroupSummariesPage(_ context.Context, _, groupID
 	page := rolloutindex.SummaryPage{Total: int64(len(items))}
 	page.Items = items[:min(limit, len(items))]
 	return page, nil
+}
+
+func (reader *browseTestReader) TrajectoryShapeEvents(_ context.Context, _ string, trajectoryIDs []string) (map[string][]shape.Event, error) {
+	reader.shapeCalls++
+	result := make(map[string][]shape.Event, len(trajectoryIDs))
+	for _, trajectoryID := range trajectoryIDs {
+		result[trajectoryID] = []shape.Event{}
+	}
+	return result, nil
 }
 
 func (reader *browseTestReader) TrajectoryContext(context.Context, string, string) (rolloutindex.TrajectoryContext, error) {
@@ -184,6 +199,9 @@ func TestIndexedBrowseAcceptsExactlyTheCapAndUsesSummaryContext(t *testing.T) {
 	}
 	if reader.contextCalls != 0 {
 		t.Fatalf("browse made %d per-trajectory context queries", reader.contextCalls)
+	}
+	if reader.shapeCalls != 1 {
+		t.Fatalf("browse made %d shape queries for one non-empty page, want 1", reader.shapeCalls)
 	}
 	payload := decodeIndexedResponse(t, response)
 	if payload["count"] != float64(maxBrowseRows) {

@@ -152,17 +152,18 @@ Keep existing bindings. Additions (conflict-checked per scope):
 | Command ID | Default | Scope |
 |---|---|---|
 | `trajectory.nextRollout` / `previousRollout` | `n` / `p` | trajectory |
+| `workspace.openDetail` | `d` | trajectory |
+| `workspace.moveMode` | `Ctrl+m`, then arrows; `Ctrl+m`/`Esc` exits | workspace |
+| `workspace.resizeMode` | `Ctrl+w`, then arrows; `Ctrl+w`/`Esc` exits | workspace |
 | `trajectory.ascend` | `Escape` | trajectory |
 | `trajectory.markIn` / `markOut` | `i` / `Shift+O` | trajectory |
 | `trajectory.goto` | `:` | trajectory |
 | `trajectory.replay` | `Shift+R` | trajectory |
 | `trajectory.pivotAggregate` | `.` | trajectory |
 | `trajectory.dropMarker` / `cycleMarkers` | `m` / `Shift+M` | trajectory |
-| `view.fidelityUp` / `fidelityDown` | `]` / `[` | all |
-| `view.fidelityUpAll` / `fidelityDownAll` | `}` / `{` | workspace |
+| `view.fidelityUp` / `fidelityDown` | `]` / `[` | all (collection representation) |
 | `view.zoomIn` / `zoomOut` / `zoomFit` | `+` / `-` / `0` | trajectory, comparison |
 | `view.zoomInAll` / `zoomOutAll` / `zoomFitAll` | `>` / `<` / `)` | workspace |
-| `group.tagVerdict*` | `1..4` | group |
 | `comparison.toggleDivergenceCurve` | `Shift+D` | comparison |
 
 ## 10. Visual and semantic invariants

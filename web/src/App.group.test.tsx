@@ -8,8 +8,8 @@ import { emptyWorkspace, laneId, serializeWorkspace } from "./workspace";
 const browse: BrowseResponse = {
   sources: [{ id: "source-1", path: "/tmp/demo.ndjson", index_state: "complete" }], count: 2,
   trajectories: [
-    { source_id: "source-1", source_name: "demo.ndjson", case_name: "demo", trajectory: { id: "reference", group_id: "group", status: "completed" }, metrics: { trajectory: { id: "reference", group_id: "group" }, event_count: 2, error_count: 0, pass: true, reward: 1 } },
     { source_id: "source-1", source_name: "demo.ndjson", case_name: "demo", trajectory: { id: "candidate", group_id: "group", status: "failed" }, metrics: { trajectory: { id: "candidate", group_id: "group" }, event_count: 2, error_count: 1, pass: false, reward: -1 } },
+    { source_id: "source-1", source_name: "demo.ndjson", case_name: "demo", trajectory: { id: "reference", group_id: "group", status: "completed" }, metrics: { trajectory: { id: "reference", group_id: "group" }, event_count: 2, error_count: 0, pass: true, reward: 1 } },
   ],
 };
 const trajectoryPayload = (id: string) => ({ trajectory: { id, group_id: "group", status: id === "candidate" ? "failed" : "completed" }, events: [{ id: `${id}-start`, sequence: 0, kind: "tool", alignment_key: "stage:work", output: { ok: true } }, { id: `${id}-end`, sequence: 10, kind: id === "candidate" ? "error" : "grader", alignment_key: "stage:outcome", output: { verdict: id === "candidate" ? "fail" : "pass" } }], page: { count: 2, total: 2, limit: 200, has_more: false } });
@@ -40,20 +40,20 @@ describe("Browse Read Compare flow", () => {
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
 		expect(screen.getAllByRole("option")[0]).toHaveTextContent("candidate");
 		expect(screen.getByRole("option", { selected: true })).toHaveTextContent("candidate");
-		expect(screen.getByText(/2 unresolved/)).toBeInTheDocument();
-		fireEvent.keyDown(window, { key: "]" }); fireEvent.keyDown(window, { key: "]" });
-		fireEvent.keyDown(window, { key: "3" });
-		expect(screen.getByText(/1 unresolved/)).toBeInTheDocument();
+		expect(screen.getByText(/2 trajectories/)).toBeInTheDocument();
+		fireEvent.keyDown(window, { key: "j" });
 		expect(screen.getByRole("option", { selected: true })).toHaveTextContent("reference");
-		await waitFor(() => expect(screen.getByRole("option", { name: /candidate/ })).toHaveTextContent("tag 3"));
 		fireEvent.keyDown(window, { key: "k" });
     fireEvent.keyDown(window, { key: "Enter" });
     expect(await screen.findByRole("main", { name: "Read trajectory" })).toHaveAttribute("data-trajectory", "candidate");
+    fireEvent.keyDown(window, { key: "Tab" });
     fireEvent.keyDown(window, { key: "Tab" });
     fireEvent.keyDown(window, { key: "j" });
     fireEvent.keyDown(window, { key: "a" });
     await waitFor(() => expect(screen.getAllByRole("main", { name: "Read trajectory" })).toHaveLength(2));
     expect(screen.getAllByRole("main", { name: "Read trajectory" }).map((lane) => lane.getAttribute("data-trajectory"))).toEqual(["candidate", "reference"]);
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
     fireEvent.keyDown(window, { key: "+", code: "Equal", shiftKey: true });
     expect(screen.getAllByRole("main", { name: "Read trajectory" })[1]).toHaveAttribute("data-axis-end", "7.0000");
     expect(screen.getAllByRole("main", { name: "Read trajectory" })[0]).toHaveAttribute("data-axis-end", "10.0000");
@@ -65,6 +65,40 @@ describe("Browse Read Compare flow", () => {
     expect(screen.getAllByRole("main", { name: "Read trajectory" })).toHaveLength(1);
     expect(screen.getByTestId("reference-name")).toHaveTextContent("none");
   });
+
+	it("keeps the newest rollout sweep when an older load resolves last", async () => {
+		const rows = ["candidate", "reference", "third"].map((id) => ({
+			...browse.trajectories[0],
+			trajectory: { ...browse.trajectories[0].trajectory, id },
+			metrics: { ...browse.trajectories[0].metrics, trajectory: { id } },
+		}));
+		const collection = { ...browse, count: rows.length, trajectories: rows };
+		const pending = new Map<string, { resolve: (value: Awaited<ReturnType<ViewerProvider["loadTrajectory"]>>) => void; signal?: AbortSignal }>();
+		const provider: ViewerProvider = {
+			async loadInitial() { return { trajectory: { ...trajectoryPayload("candidate").trajectory, events: trajectoryPayload("candidate").events }, isSample: false }; },
+			async loadBrowse() { return collection; },
+			loadTrajectory(_sourceId, trajectoryId, signal) {
+				if (trajectoryId === "candidate") return Promise.resolve({ trajectory: { ...trajectoryPayload("candidate").trajectory, events: trajectoryPayload("candidate").events }, isSample: false });
+				return new Promise((resolve) => pending.set(trajectoryId, { resolve, signal }));
+			},
+			async loadAnalysis() { return { analysis: { api_version: "v1", provenance: { name: "test", version: "1", digest: "x", input_digest: "y" } }, cached: false, analyzed_at: "now" }; },
+			async loadComparison() { return comparison; },
+			async loadArtifactContent() { throw new Error("unused"); },
+		};
+		render(<App provider={provider} />);
+		await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(3));
+		fireEvent.keyDown(window, { key: "Enter" });
+		await screen.findByRole("main", { name: "Read trajectory" });
+		fireEvent.keyDown(window, { key: "n" });
+		fireEvent.keyDown(window, { key: "p" });
+		await waitFor(() => expect(pending.size).toBe(2));
+		expect(pending.get("reference")?.signal?.aborted).toBe(true);
+		pending.get("third")!.resolve({ trajectory: { ...trajectoryPayload("third").trajectory, events: trajectoryPayload("third").events }, isSample: false });
+		await waitFor(() => expect(screen.getByRole("main", { name: "Read trajectory" })).toHaveAttribute("data-trajectory", "third"));
+		pending.get("reference")!.resolve({ trajectory: { ...trajectoryPayload("reference").trajectory, events: trajectoryPayload("reference").events }, isSample: false });
+		await waitFor(() => expect(screen.getByRole("main", { name: "Read trajectory" })).toHaveAttribute("data-trajectory", "third"));
+		expect(document.querySelector(".instrument-shell")?.getAttribute("data-active-zone")).toBe(laneId("source-1", "third"));
+	});
 
 	it("does not apply late analysis to another rollout", async () => {
 		let resolveCandidateAnalysis!: (value: Response) => void;
@@ -160,7 +194,7 @@ describe("Browse Read Compare flow", () => {
 	it("sweeps the active context lane without replacing either focus lane", async () => {
 		const collection: BrowseResponse = {
 			...browse, count: 4, trajectories: [
-				browse.trajectories[1], browse.trajectories[0],
+				browse.trajectories[0], browse.trajectories[1],
 				{ ...browse.trajectories[0], trajectory: { id: "third" }, metrics: { event_count: 2 } },
 				{ ...browse.trajectories[0], trajectory: { id: "fourth" }, metrics: { event_count: 2 } },
 			],
@@ -175,10 +209,15 @@ describe("Browse Read Compare flow", () => {
 		render(<App />);
 		await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(4));
 		fireEvent.keyDown(window, { key: "Enter" });
-		fireEvent.keyDown(window, { key: "Tab" }); fireEvent.keyDown(window, { key: "j" }); fireEvent.keyDown(window, { key: "a" });
+		await screen.findByRole("main", { name: "Read trajectory" });
+		// `a` piles lanes in while focus stays in the collection.
+		fireEvent.keyDown(window, { key: "Tab" }); fireEvent.keyDown(window, { key: "Tab" }); fireEvent.keyDown(window, { key: "j" }); fireEvent.keyDown(window, { key: "a" });
 		await waitFor(() => expect(screen.getAllByRole("main", { name: "Read trajectory" })).toHaveLength(2));
-		fireEvent.keyDown(window, { key: "Tab" }); fireEvent.keyDown(window, { key: "j" }); fireEvent.keyDown(window, { key: "a" });
+		// add keeps the collection focused, so the next add needs no Tab round-trip
+		fireEvent.keyDown(window, { key: "j" }); fireEvent.keyDown(window, { key: "a" });
 		await screen.findByRole("main", { name: "Context lane third" });
+		fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+		fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
 		fireEvent.keyDown(window, { key: "n" });
 		await screen.findByRole("main", { name: "Context lane fourth" });
 		expect(screen.getAllByRole("main", { name: "Read trajectory" }).map((lane) => lane.getAttribute("data-trajectory"))).toEqual(["candidate", "reference"]);

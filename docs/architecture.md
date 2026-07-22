@@ -54,26 +54,27 @@ operate the CLI and can author project-local adapters; RLViz remains the viewer.
 | `internal/watch` | Growing-file and replacement detection |
 | `web/src` | React viewer and typed API client |
 | `web/dist` | Generated production UI embedded by `web/embed.go` |
-| `webapp` | Separate static browser viewer for `app.rlviz.dev`; reuses `web/src` through the provider boundary |
+| `webapp` | Static browser entry point for `rlviz.dev`; reuses `web/src` through the provider boundary |
 | `internal/browsercore` | WASM-safe normalization, validation, in-memory browse/read data, analysis, and comparison |
 | `schemas/v1alpha1` | Public canonical and plugin contracts |
 | `fixtures` | Canonical, malformed, adversarial, and protocol conformance data |
 | `examples` | Runnable adapters and deterministic public gallery traces |
 | `integrations` | Codex, Claude Code, and Cursor project instructions |
-| `site` | Zero-dependency static docs source; generated output lives in `site/dist` |
+| `site` | External documentation generated beside the browser entry point in `site/dist` |
 | `docs/adr` | Durable architectural decisions and their tradeoffs |
 
 ## Runtime paths
 
 ### Open a source in the hosted browser viewer
 
-`app.rlviz.dev` is a separate static surface from the documentation site. The
-landing page reads a dropped or selected `File` into the current tab. A Go WASM
-core detects canonical NDJSON, Inspect AI EvalLog JSON, or Verifiers
-GenerateOutputs JSON, validates canonical records, and builds an in-memory
-collection. The shared React instrument consumes a `ViewerProvider`; the CLI
-uses the daemon HTTP provider and the static app uses the in-memory provider.
-Viewer components are not forked.
+`rlviz.dev` serves the browser viewer and generated external documentation from
+one static deployment. The former `app.rlviz.dev` surface redirects to the same
+path on `rlviz.dev`. The landing page reads a dropped or selected `File` into
+the current tab. A Go WASM core detects canonical NDJSON, Inspect AI EvalLog
+JSON, or Verifiers GenerateOutputs JSON, validates canonical records, and
+builds an in-memory collection. The shared React instrument consumes a
+`ViewerProvider`; the CLI uses the daemon HTTP provider and the static app uses
+the in-memory provider. Viewer components are not forked.
 
 The app makes no outbound request containing trace bytes. Its JavaScript, Go
 WASM runtime, WASM binary, and examples are local static build assets, with no
@@ -169,8 +170,17 @@ semantics pending broader real-format evidence. See `data-model.md` and
 
 The React application has three levels of research surfaces:
 
-- `App.tsx`: trajectory loading, routing, shared event selection, landmark rail,
-  and selected-event-first inspector
+- `App.tsx`: composes the workspace modules and command handlers
+- `workspaceController.ts`: reducer-backed logical workspace state, compact URL
+  history, jumplist history, and topology-matched local geometry restore
+- `laneLoader.ts`: cancellable per-lane and per-slot loading, bounded off-lane
+  cache ownership, and stale-response rejection
+- `workspaceDock.ts`: the adapter between logical workspace modules and
+  Dockview panel IDs, default placement, reconciliation, and focus targets
+- `useWorkspaceDock.ts`: owns the Dockview runtime lifecycle, subscriptions,
+  geometry persistence, module focus, and teardown
+- `viewerMetadata.ts`: bounded device-local collection and trajectory labels;
+  source traces and shared workspace URLs remain unchanged
 - `ContextTrack.tsx`: sparse context observations, lifecycle navigation, and
   exact selected-event context evidence without interpolation
 - `ContextDetails.tsx`: selected context facts, provenance, derivation, and

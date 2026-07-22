@@ -1,15 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { defaultSeams, effectiveDepth, emptyWorkspace, laneId, legacyWorkspace, normalizeWorkspace, serializeWorkspace, workspaceFromSearch, workspaceURL } from "./workspace";
+import { effectiveDepth, emptyWorkspace, laneId, legacyWorkspace, normalizeWorkspace, serializeWorkspace, workspaceFromSearch, workspaceURL } from "./workspace";
 
 describe("workspace arrangements", () => {
-  it("round-trips lanes, per-lane view state, and seam ratios", () => {
+  it("round-trips lanes, per-lane view state, and dockview layout JSON", () => {
     const workspace = emptyWorkspace();
-    workspace.lanes = [{ id: laneId("source", "one"), sourceId: "source", trajectoryId: "one", band: "focus", selected: 4, depth: 4, fidelity: 5, axis: { start: 10, end: 20 }, descentStack: [{ depth: 3, axis: { start: 0, end: 30 } }] }];
+    workspace.collectionView = "trials";
+    workspace.lanes = [{ id: laneId("source", "one"), sourceId: "source", trajectoryId: "one", band: "focus", selected: 4, depth: 4, fidelity: 2, axis: { start: 10, end: 20 }, descentStack: [{ depth: 3, axis: { start: 0, end: 30 } }] }];
     workspace.active = workspace.lanes[0].id;
-    workspace.seams.rail = 0.31;
+    workspace.layout = { grid: { root: { type: "leaf", data: { id: "group" }, size: 100 }, width: 1000, height: 700, orientation: 0 }, panels: {} } as never;
     const encoded = serializeWorkspace(workspace);
     expect(workspaceFromSearch(`?workspace=${encodeURIComponent(encoded)}`)).toEqual(workspace);
-    expect(workspaceURL(workspace, { pathname: "/view", search: "?trajectory=old&mode=read", hash: "#token=x" } as Location)).toContain("workspace=");
+    const url = workspaceURL(workspace, { pathname: "/view", search: "?trajectory=old&mode=read", hash: "#token=x" } as Location);
+    expect(url).toContain("workspace=");
+    expect(JSON.parse(new URL(url, "http://local").searchParams.get("workspace")!)).not.toHaveProperty("layout");
+  });
+
+  it("round-trips rollout-pinned detail modules and drops orphaned details", () => {
+    const workspace = emptyWorkspace();
+    const id = laneId("source", "one");
+    workspace.lanes = [{ id, sourceId: "source", trajectoryId: "one", band: "focus", selected: 0, depth: 1, fidelity: 1, axis: { start: 0, end: 1 }, descentStack: [] }];
+    workspace.details = [id, "missing"];
+    workspace.active = `detail:${id}`;
+    const normalized = normalizeWorkspace(workspace)!;
+    expect(normalized.details).toEqual([id]);
+    expect(normalized.active).toBe(`detail:${id}`);
   });
 
   it("uses Surface as context's effective depth without discarding stored focus depth", () => {
@@ -25,12 +39,28 @@ describe("workspace arrangements", () => {
     expect(serializeWorkspace(normalized)).not.toContain("railProjection");
   });
 
-  it("bounds untrusted ratios and keeps at most two focus lanes", () => {
-    const normalized = normalizeWorkspace({ ...emptyWorkspace(), seams: { rail: 9, focusContext: -1, focusLane: 9, console: 0 }, lanes: ["a", "b", "c"].map((trajectoryId) => ({ sourceId: "s", trajectoryId, band: "focus", axis: { start: 0, end: 1 } })) })!;
+  it("migrates v2 state and keeps at most two focus lanes", () => {
+    const normalized = normalizeWorkspace({ ...emptyWorkspace(), version: 2, seams: { rail: 9, focusContext: -1, focusLane: 9, console: 0 }, lanes: ["a", "b", "c"].map((trajectoryId) => ({ sourceId: "s", trajectoryId, band: "focus", axis: { start: 0, end: 1 } })) })!;
     expect(normalized.lanes.filter((lane) => lane.band === "focus")).toHaveLength(2);
     expect(normalized.lanes[2].band).toBe("context");
-    expect(normalized.seams).not.toEqual(defaultSeams);
-    expect(normalized.seams.rail).toBe(0.42);
+    expect(normalized.version).toBe(3);
+    expect(normalized.layout).toBeUndefined();
+  });
+
+  it("falls back to the default layout for corrupt workspace and dockview input", () => {
+    expect(normalizeWorkspace(undefined)).toBeUndefined();
+    expect(normalizeWorkspace({ version: 99 })).toBeUndefined();
+    const normalized = normalizeWorkspace({ ...emptyWorkspace(), layout: { grid: "bad", panels: [] } })!;
+    expect(normalized.layout).toBeUndefined();
+  });
+
+  it("rejects dock layouts beyond the local restore bounds", () => {
+    const panels = Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`panel-${index}`, {}]));
+    const normalized = normalizeWorkspace({
+      ...emptyWorkspace(),
+      layout: { grid: { root: { type: "leaf", data: { id: "group" }, size: 100 }, width: 1000, height: 700, orientation: 0 }, panels },
+    })!;
+    expect(normalized.layout).toBeUndefined();
   });
 
   it("keeps the first duplicate lane before clamping the focus band", () => {

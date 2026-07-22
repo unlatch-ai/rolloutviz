@@ -7,7 +7,7 @@
 | Name | RLViz |
 | npm package | `rlviz` |
 | CLI | `rlviz` |
-| Tagline | Visualize and compare agent rollouts. |
+| Tagline | Inspect agent rollouts locally. |
 
 ## Problem
 
@@ -95,11 +95,10 @@ A viewer-created selection of trajectories, potentially across runs, checkpoints
 
 ### Open in the browser without installing
 
-The separate static app at `app.rlviz.dev` opens local traces without an
-account or upload. Its landing promise is literal: **your trace is parsed in
-this tab and never uploaded**. It shares the instrument viewer with the CLI,
-but uses a Go WebAssembly core and an in-memory collection instead of the local
-daemon and SQLite index.
+`rlviz.dev` opens local traces without an account or upload. The trace is parsed
+in the tab and never uploaded. The browser uses the same instrument viewer as
+the CLI, with a Go WebAssembly core and an in-memory collection instead of the
+local daemon and SQLite index.
 
 The browser viewer is for individual files and modest cohorts. The UI and Go
 core both refuse files above 32 MiB with a CLI next step because the raw bytes,
@@ -153,15 +152,17 @@ rlviz open ./trajectory.jsonl --adapter ./plugins/customer-x
 
 ## Single-trajectory viewer
 
-The initial UI has three panes:
-
-1. Event outline and filters
-2. Main trajectory timeline
-3. Selected-event inspector
+The viewer is a docked workspace with a collection module, one or more rollout
+modules, a selected-event detail module, and optional rollout-pinned detail
+modules. Additional rollouts open as rows by default. Modules can be moved and
+resized with the pointer or keyboard.
 
 The viewer must support:
 
 - collapsed rendering for large model and tool payloads
+- adjustable overview fidelity and semantic depth
+- a draggable and resizable full-rollout timeline viewport
+- an always-visible keybar for the active module
 - distinct visual treatment for actions, observations, errors, rewards, and grader output
 - raw JSON inspection for every normalized event
 - source file and byte/line location

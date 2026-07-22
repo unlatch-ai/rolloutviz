@@ -40,8 +40,10 @@ web-e2e:
 gallery:
 	go run ./cmd/gallerygen
 
-site:
+site: webapp
 	go run ./cmd/sitegen
+	cp -R webapp/dist/. site/dist/
+	cp site/vercel.json site/dist/vercel.json
 
 test:
 	go test ./...

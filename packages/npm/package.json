@@ -1,7 +1,7 @@
 {
   "name": "rlviz",
   "version": "0.1.0",
-  "description": "Visualize and compare agent rollouts.",
+  "description": "Inspect agent rollouts locally.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

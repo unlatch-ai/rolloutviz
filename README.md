@@ -1,199 +1,93 @@
 # RLViz
 
-Visualize and compare agent rollouts.
+Inspect agent rollouts locally.
 
-RLViz is a local, open-source viewer for agent trajectories. Point it at a trace, open the viewer, and inspect what the model, tools, grader, and environment did step by step.
+RLViz opens existing agent traces in a keyboard-first viewer. Read each model,
+tool, environment, grader, and artifact event; compare trajectories; and trace
+normalized data back to its raw source record. The source is never modified.
 
-Full documentation lives at [rlviz.dev](https://rlviz.dev).
-
-The long-term goal is a lightweight workbench for people building agent environments and post-training systems:
-
-- open one trajectory without importing it into a hosted platform
-- inspect messages, actions, observations, rewards, grader output, and artifacts
-- compare trajectories from the same rollout group
-- find the first meaningful behavioral divergence
-- extend support for private formats with local adapter plugins
-- invoke the viewer directly or through coding agents such as Claude Code, Codex, and Cursor
+Open a supported file directly at [rlviz.dev](https://rlviz.dev). Parsing and
+indexing stay in the browser tab. Use the CLI for larger traces, growing files,
+private formats, and local adapters.
 
 ## Quickstart
 
-Install the native binary, choose your default interface, open the synthetic
-gallery, then inspect a real trace in the TUI:
-
 ```bash
 brew install TheSnakeFang/tap/rlviz
-rlviz init
-rlviz demo
-rlviz open --tui ./path/to/trajectory.ndjson
-```
-
-The gallery is deterministic synthetic data: a 300-event coding-agent bugfix
-with a retry comb and compaction, a 120-event research run, and a 16-rollout
-checkout cohort containing pass, policy-failure, and infrastructure-failure
-outcomes. It opens in Browse so attention ordering, fidelity, verdict tagging,
-Read, and Compare can be exercised without using private traces.
-
-Canonical NDJSON works directly. For a private or unsupported format, start
-with the [adapter authoring guide](https://rlviz.dev/adapter-authoring.html).
-
-## Status
-
-RLViz accepts canonical v1alpha1 NDJSON, validates and indexes it locally, starts a loopback-only daemon, and opens an embedded keyboard-first viewer:
-
-```bash
-rlviz open ./path/to/trajectory.jsonl
-```
-
-Open the bundled synthetic research demo or inspect available built-in and
-trusted plugin formats:
-
-```bash
-rlviz init
-rlviz demo
-rlviz formats
 rlviz inspect ./path/to/rollout.ndjson
-rlviz setup agent codex --print
-rlviz plugin init --type adapter --from ./private.trace .rlviz/plugins/private-format
+rlviz open ./path/to/rollout.ndjson
 ```
 
-`rlviz init` stores a browser/TUI default and can install reviewed agent skills
-into their standard locations. The lower-level setup command prints
-version-matched instructions for Codex, Claude Code, or Cursor without modifying
-the current project. Add `--json` for structured output an agent can consume.
-
-Build it and open a canonical fixture:
-
-```bash
-make web-install
-make build
-./bin/rlviz open ./fixtures/canonical/linear.ndjson
-```
-
-Apply a validated, non-executable presentation config explicitly:
-
-```bash
-rlviz open ./trace.ndjson --presentation ./presentation.json
-# foreground debugging uses the same contract
-rlviz serve ./trace.ndjson --presentation ./presentation.json
-```
-
-The CLI validates the bounded JSON before contacting or starting the daemon.
-The daemon validates it again, stores only normalized JSON, and returns it as
-the top-level `presentation` object. Opening the same source without
-`--presentation` clears its prior presentation configuration. The contract can
-order or hide fixed inspector sections, but cannot replace the selected-event
-header or raw normalized record. It can also provide portable defaults for
-stable core command bindings; local browser edits remain higher priority.
-
-`rlviz open` starts or reuses a private loopback daemon and returns after registration. Its default surface comes from `rlviz init`; explicit `--tui`, `--no-open`, and `--json` flags still win. Use `rlviz status` and `rlviz stop` to inspect or stop it. `rlviz serve` remains the explicit foreground debugging mode and uses a temporary local index with the same Browse and trajectory API as daemon mode.
-
-The daemon incrementally decodes sources into a private SQLite cache, watches opened files for changes, and serves paginated events to a virtualized UI. Group sources add a sortable trajectory table, aggregate outcomes, compact behavioral paths, and deterministic two-run divergence comparison.
-
-Inspect the local SQLite index, or remove it after stopping the daemon:
-
-```bash
-rlviz cache status
-rlviz stop
-rlviz cache clean
-```
-
-Both cache commands accept `--json`. Cleanup only removes `index.sqlite` and its SQLite `-wal` and `-shm` siblings.
-
-Private formats can use project-local process adapters:
-
-```bash
-./bin/rlviz plugin init --type adapter --lang python --from ./path/to/trace .rlviz/plugins/customer-trace
-# Review the generated executable code before trusting it.
-./bin/rlviz plugin trust .rlviz/plugins/customer-trace
-./bin/rlviz plugin validate .rlviz/plugins/customer-trace ./path/to/trace
-./bin/rlviz open ./path/to/trace --adapter .rlviz/plugins/customer-trace
-```
-
-See [`docs/adapter-authoring.md`](docs/adapter-authoring.md) and the working
-[`simple-jsonl`](examples/adapters/simple-jsonl),
-[`Inspect AI`](examples/adapters/inspect-ai), and
-[`Verifiers`](examples/adapters/verifiers) examples.
-
-## Install
-
-Release archives contain one native binary and require no language runtime. Install the latest verified archive with:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/TheSnakeFang/rlviz/main/scripts/install.sh | sh
-```
-
-Set `RLVIZ_VERSION` to pin a release and `RLVIZ_INSTALL_DIR` to choose the destination. The installer verifies the release checksum before installing `rlviz`.
-
-On macOS or Linux with Homebrew:
-
-```bash
-brew install TheSnakeFang/tap/rlviz
-```
-
-For Node-based environments and coding-agent sandboxes, the same native binary is available through npm:
+Other installation paths use the same native binary:
 
 ```bash
 npm install --global rlviz
+curl -fsSL https://rlviz.dev/install.sh | sh
 ```
 
-The npm installer selects the matching macOS or Linux release and verifies its checksum. npm is an installation path only; the viewer itself remains a native Go binary.
+Run `rlviz demo` for three deterministic synthetic examples: a coding trace, a
+research trace, and a 16-rollout checkout cohort.
 
-Homebrew, npm, and the shell installer install the `rlviz` executable. They do
-not modify a user's repositories or automatically install agent rules. The
-binary contains version-matched, reviewable instruction snippets for Codex,
-Claude Code, and Cursor. Print or explicitly create one with:
+## What it does
+
+- Opens canonical NDJSON, Inspect AI EvalLog JSON, Verifiers GenerateOutputs
+  JSON, and explicitly trusted adapter output.
+- Browses one trajectory or a collection with truthful event positions,
+  adjustable fidelity and depth, trial grouping, landmarks, and a draggable
+  timeline viewport.
+- Arranges rollout modules as rows or columns, pins rollout-specific detail,
+  and keeps the active module's shortcuts visible.
+- Compares trajectories with deterministic behavioral alignment and a first
+  meaningful divergence.
+- Runs locally: the CLI binds to loopback, makes no outbound requests during
+  viewing, and stores only a removable SQLite index.
+
+RLViz does not run agents, execute recorded tools, train models, manage prompts,
+or provide hosted monitoring.
+
+## Unsupported formats
+
+Probe the source first:
 
 ```bash
-rlviz setup agent codex --print
-rlviz setup agent codex --dry-run --destination .agents/rlviz.md
-rlviz setup agent codex --write --destination .agents/rlviz.md
+rlviz formats
+rlviz inspect --json ./path/to/private.trace
 ```
 
-Writes are opt-in and create-only: RLViz never overwrites or silently edits a
-project's existing agent instructions. The first-run wizard can install the
-same reviewed content as a Codex or Claude Code skill, or as a Cursor rule,
-after showing the exact destination and content and receiving confirmation.
-These files teach an agent how to open traces and build adapters; they are not
-executable plugins.
+For a private format, scaffold a project-local process adapter, review its
+executable code, then trust and validate that exact digest:
 
-## Design principles
+```bash
+rlviz plugin init --type adapter --from ./path/to/private.trace .rlviz/plugins/private-format
+rlviz plugin trust .rlviz/plugins/private-format
+rlviz plugin validate .rlviz/plugins/private-format ./path/to/private.trace
+rlviz open ./path/to/private.trace --adapter .rlviz/plugins/private-format
+```
 
-- **Local first.** No account, upload, instrumentation SDK, or hosted service required.
-- **Read existing artifacts.** Adapters translate stored trajectory formats into a small canonical event model.
-- **Agent extensible.** Unsupported formats should produce enough structured context for a coding agent to implement and validate an adapter.
-- **Lossless inspection.** Normalized events always link back to their raw source records.
-- **Fast by default.** Large files are streamed and indexed instead of loaded wholesale.
-- **Comparison aware.** Rollout groups, behavioral paths, and aligned pair comparisons are first-class views.
+See the [adapter authoring guide](https://rlviz.dev/adapter-authoring.html) and
+[supported formats](docs/supported-formats.md).
 
-## Repository map
+## Documentation
 
-- [`docs/product-spec.md`](docs/product-spec.md) defines the user experience and scope.
-- [`docs/architecture.md`](docs/architecture.md) is the current subsystem and runtime map.
-- [`docs/ui-information-architecture.md`](docs/ui-information-architecture.md) defines the target researcher workflow and screen hierarchy.
-- [`docs/design-system.md`](docs/design-system.md) defines visual and interaction invariants.
-- [`docs/data-model.md`](docs/data-model.md) tracks canonical research semantics and protocol evolution.
-- [`docs/onboarding.md`](docs/onboarding.md) defines the expert and coding-agent setup journey.
-- [`docs/supported-formats.md`](docs/supported-formats.md) states exactly what RLViz can open today.
-- [`docs/plugin-model.md`](docs/plugin-model.md) defines adapter, analyzer, and safe customization boundaries.
-- [`docs/testing.md`](docs/testing.md) defines fixtures, test layers, and quality budgets.
-- [`docs/adapter-protocol.md`](docs/adapter-protocol.md) defines the external adapter boundary.
-- [`docs/implementation-plan.md`](docs/implementation-plan.md) breaks the work into testable milestones.
-- [`docs/releasing.md`](docs/releasing.md) documents native, Homebrew, and npm publication.
-- [`integrations/`](integrations/) contains instructions for Codex, Claude Code, and Cursor.
+- [User documentation](https://rlviz.dev/docs.html)
+- [Product scope](docs/product-spec.md)
+- [Architecture](docs/architecture.md)
+- [Data model](docs/data-model.md)
+- [Interaction model](docs/interaction-spec.md)
+- [Feature registry](FEATURES.md)
+- [Testing](docs/testing.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Development
 
-The core is written in Go. The local React and TypeScript viewer is compiled and embedded in the release binary.
+The core and CLI are Go. The embedded viewer is React and TypeScript.
 
 ```bash
 make web-install
+make webapp-install
 make check
 make build
 ./bin/rlviz version
 ```
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) before sending a change.
-
-## License
-
-Apache 2.0. See [`LICENSE`](LICENSE).
+Apache 2.0. See [LICENSE](LICENSE).

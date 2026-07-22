@@ -9,7 +9,7 @@ export const commandIds = {
     toggleRail: "workspace.toggleRail", addLane: "workspace.addLane", closeLane: "workspace.closeLane",
     cycleNext: "workspace.cycleNext", cyclePrevious: "workspace.cyclePrevious", nextRollout: "workspace.nextRollout", previousRollout: "workspace.previousRollout",
     promoteDemote: "workspace.promoteDemote", pinReference: "workspace.pinReference", directionRows: "workspace.directionRows", directionColumns: "workspace.directionColumns",
-    descend: "workspace.descend", ascend: "workspace.ascend", jumpBack: "workspace.jumpBack", jumpForward: "workspace.jumpForward", resizeMode: "workspace.resizeMode",
+    descend: "workspace.descend", ascend: "workspace.ascend", openDetail: "workspace.openDetail", jumpBack: "workspace.jumpBack", jumpForward: "workspace.jumpForward", resizeMode: "workspace.resizeMode", moveMode: "workspace.moveMode",
   },
   trajectory: {
     dismiss: "trajectory.dismiss", search: "trajectory.search", next: "trajectory.next", previous: "trajectory.previous",
@@ -22,7 +22,7 @@ export const commandIds = {
     pivotAggregate: "trajectory.pivotAggregate", dropMarker: "trajectory.dropMarker", cycleMarkers: "trajectory.cycleMarkers",
   },
   view: {
-    fidelityUp: "view.fidelityUp", fidelityDown: "view.fidelityDown", fidelityUpAll: "view.fidelityUpAll", fidelityDownAll: "view.fidelityDownAll",
+    fidelityUp: "view.fidelityUp", fidelityDown: "view.fidelityDown",
     zoomIn: "view.zoomIn", zoomOut: "view.zoomOut", zoomFit: "view.zoomFit",
     zoomInAll: "view.zoomInAll", zoomOutAll: "view.zoomOutAll", zoomFitAll: "view.zoomFitAll",
     toggleHelp: "view.toggleHelp",
@@ -33,8 +33,6 @@ export const commandIds = {
     compare: "group.compare", best: "group.best", median: "group.median", worst: "group.worst",
     rewardOutlier: "group.rewardOutlier", nextFailure: "group.nextFailure", nextInfraFailure: "group.nextInfraFailure",
     toggleColumns: "group.toggleColumns",
-    tagVerdict1: "group.tagVerdict1", tagVerdict2: "group.tagVerdict2",
-    tagVerdict3: "group.tagVerdict3", tagVerdict4: "group.tagVerdict4",
   },
   paths: {
     back: "paths.back", togglePaths: "paths.togglePaths", next: "paths.next", previous: "paths.previous", open: "paths.open",
@@ -61,8 +59,8 @@ export const commands: readonly CommandDefinition[] = [
   { id: commandIds.workspace.toggleRail, scope: "workspace", label: "Toggle collection rail", defaultBindings: ["t"] },
   { id: commandIds.workspace.addLane, scope: "workspace", label: "Add selected rollout as a lane", defaultBindings: ["a"] },
   { id: commandIds.workspace.closeLane, scope: "workspace", label: "Close active lane", defaultBindings: ["x"] },
-  { id: commandIds.workspace.cycleNext, scope: "workspace", label: "Cycle active zone", defaultBindings: ["Tab"] },
-  { id: commandIds.workspace.cyclePrevious, scope: "workspace", label: "Cycle active zone backward", defaultBindings: ["Shift+Tab"] },
+  { id: commandIds.workspace.cycleNext, scope: "workspace", label: "Next module (Alt+arrows)", defaultBindings: ["Tab", "Alt+ArrowRight", "Alt+ArrowDown"] },
+  { id: commandIds.workspace.cyclePrevious, scope: "workspace", label: "Previous module (Alt+arrows)", defaultBindings: ["Shift+Tab", "Alt+ArrowLeft", "Alt+ArrowUp"] },
   { id: commandIds.workspace.nextRollout, scope: "workspace", label: "Sweep lane to next rollout", defaultBindings: ["n"] },
   { id: commandIds.workspace.previousRollout, scope: "workspace", label: "Sweep lane to previous rollout", defaultBindings: ["p"] },
   { id: commandIds.workspace.promoteDemote, scope: "workspace", label: "Promote or demote active lane", defaultBindings: ["Shift+Enter"] },
@@ -71,9 +69,11 @@ export const commands: readonly CommandDefinition[] = [
   { id: commandIds.workspace.directionColumns, scope: "workspace", label: "Place focus lanes in columns", defaultBindings: ["Shift+V"] },
   { id: commandIds.workspace.descend, scope: "workspace", label: "Descend active lane", defaultBindings: ["Enter", "Space"] },
   { id: commandIds.workspace.ascend, scope: "workspace", label: "Ascend active lane or restore arrangement", defaultBindings: ["Escape"] },
+  { id: commandIds.workspace.openDetail, scope: "workspace", label: "Open rollout detail", defaultBindings: ["d"] },
   { id: commandIds.workspace.jumpBack, scope: "workspace", label: "Previous workspace arrangement", defaultBindings: ["Ctrl+o"] },
   { id: commandIds.workspace.jumpForward, scope: "workspace", label: "Next workspace arrangement", defaultBindings: ["Ctrl+i"] },
-  { id: commandIds.workspace.resizeMode, scope: "workspace", label: "Enter seam resize mode", defaultBindings: ["Ctrl+w"] },
+  { id: commandIds.workspace.resizeMode, scope: "workspace", label: "Toggle seam resize mode", defaultBindings: ["Ctrl+w"] },
+  { id: commandIds.workspace.moveMode, scope: "workspace", label: "Toggle module move mode", defaultBindings: ["Ctrl+m"] },
   { id: commandIds.trajectory.dismiss, scope: "overlay", label: "Close search or dialog", defaultBindings: ["Escape"], allowInInput: true },
   { id: commandIds.trajectory.search, scope: "trajectory", label: "Search events", defaultBindings: ["/"] },
   { id: commandIds.trajectory.next, scope: "trajectory", label: "Next event", defaultBindings: ["j"] },
@@ -104,8 +104,6 @@ export const commands: readonly CommandDefinition[] = [
 
   { id: commandIds.view.fidelityUp, scope: "all", label: "Increase fidelity", defaultBindings: ["]"] },
   { id: commandIds.view.fidelityDown, scope: "all", label: "Decrease fidelity", defaultBindings: ["["] },
-  { id: commandIds.view.fidelityUpAll, scope: "all", label: "Increase fidelity in all lanes", defaultBindings: ["}"] },
-  { id: commandIds.view.fidelityDownAll, scope: "all", label: "Decrease fidelity in all lanes", defaultBindings: ["{"] },
   { id: commandIds.view.zoomIn, scope: "all", label: "Zoom in around selection", defaultBindings: ["+", "="] },
   { id: commandIds.view.zoomOut, scope: "all", label: "Zoom out around selection", defaultBindings: ["-"] },
   { id: commandIds.view.zoomFit, scope: "all", label: "Fit axis", defaultBindings: ["0"] },
@@ -130,10 +128,6 @@ export const commands: readonly CommandDefinition[] = [
   { id: commandIds.group.nextFailure, scope: "group", label: "Jump to next failed trajectory", defaultBindings: ["f"] },
   { id: commandIds.group.nextInfraFailure, scope: "group", label: "Jump to next infrastructure failure", defaultBindings: ["i"] },
   { id: commandIds.group.toggleColumns, scope: "group", label: "Configure table columns", defaultBindings: ["Shift+C"] },
-  { id: commandIds.group.tagVerdict1, scope: "group", label: "Tag verdict accepted", defaultBindings: ["1"] },
-  { id: commandIds.group.tagVerdict2, scope: "group", label: "Tag verdict investigate", defaultBindings: ["2"] },
-  { id: commandIds.group.tagVerdict3, scope: "group", label: "Tag verdict policy failure", defaultBindings: ["3"] },
-  { id: commandIds.group.tagVerdict4, scope: "group", label: "Tag verdict infrastructure", defaultBindings: ["4"] },
 
   { id: commandIds.paths.back, scope: "paths", label: "Back to trajectory", defaultBindings: ["Escape"], allowInInput: true },
   { id: commandIds.paths.togglePaths, scope: "paths", label: "Back to trajectories", defaultBindings: ["p"] },
@@ -313,6 +307,11 @@ export function bindingLabel(id: CommandId, overrides = loadKeymapOverrides()): 
   return bindingsFor(id, overrides).map((binding) => binding === "Space" ? "Space" : binding === "Escape" ? "Esc" : binding).join(" / ");
 }
 
+export function firstBindingLabel(id: CommandId, overrides = loadKeymapOverrides()): string {
+  const binding = bindingsFor(id, overrides)[0] ?? "";
+  return binding === "Space" ? "Space" : binding === "Escape" ? "Esc" : binding;
+}
+
 /** Re-render a command surface when this tab or another tab edits the keymap. */
 export function useKeymapRevision(): number {
   const [revision, setRevision] = useState(0);
@@ -327,4 +326,23 @@ export function useKeymapRevision(): number {
     };
   }, []);
   return revision;
+}
+
+/** Execute a command as if its first binding were pressed. Used by the keybar
+ * so pointer users get exactly the keyboard behavior. */
+export function dispatchCommand(id: CommandId): void {
+  const binding = bindingsFor(id, loadKeymapOverrides())[0];
+  if (!binding) return;
+  const parts = normalizeBinding(binding).split("+");
+  const key = parts.pop() ?? "";
+  const primaryIsMeta = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
+  const mod = parts.includes("Mod");
+  window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: key === "Space" ? " " : key,
+    bubbles: true,
+    ctrlKey: parts.includes("Ctrl") || (mod && !primaryIsMeta),
+    metaKey: parts.includes("Meta") || (mod && primaryIsMeta),
+    altKey: parts.includes("Alt"),
+    shiftKey: parts.includes("Shift"),
+  }));
 }

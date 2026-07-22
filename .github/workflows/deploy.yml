@@ -1,4 +1,4 @@
-name: deploy static surfaces
+name: deploy public site
 
 on:
   push:
@@ -45,17 +45,15 @@ jobs:
           cache-dependency-path: |
             web/package-lock.json
             webapp/package-lock.json
-      - name: Build documentation site
+      - name: Build the public site
         run: make site
-      - name: Build browser app and Go WebAssembly core
-        run: make webapp
       - name: Install Vercel CLI
         run: npm install --global vercel@56.4.1
-      - name: Deploy documentation
+      - name: Deploy the viewer and documentation
         env:
           VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID_DOCS }}
         run: vercel deploy site/dist --prod --yes --scope "$VERCEL_ORG_ID"
-      - name: Deploy browser app
+      - name: Redirect the former app domain
         env:
           VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID_APP }}
-        run: vercel deploy webapp/dist --prod --yes --scope "$VERCEL_ORG_ID"
+        run: vercel deploy app-redirect --prod --yes --scope "$VERCEL_ORG_ID"
