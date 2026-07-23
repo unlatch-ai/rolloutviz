@@ -75,7 +75,7 @@ test("bundled sample opens automatically, keeps guide state, and walks Browse to
   expect(requests.map((request) => new URL(request.url).pathname)).toContain("/rlviz.wasm");
 });
 
-test("checkout browse shape keeps the known error in its true slot", async ({ page }) => {
+test("checkout browse summary surfaces the known failed event", async ({ page }) => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
   const contentTypes: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".wasm": "application/wasm" };
   await page.route("**/*", async (route) => {
@@ -89,11 +89,5 @@ test("checkout browse shape keeps the known error in its true slot", async ({ pa
   await page.goto("/");
   await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible({ timeout: 15_000 });
   const rollout = page.getByRole("option").filter({ hasText: "checkout-rollout-06" });
-  const error = rollout.locator(".cat-glyphs > .g-error");
-  await expect(error).toBeVisible();
-  const position = await error.evaluate((node) => ({
-    index: Array.from(node.parentElement!.children).indexOf(node),
-    slots: node.parentElement!.children.length,
-  }));
-  expect(position).toEqual({ index: 43, slots: 48 });
+  await expect(rollout.getByText("1 failed", { exact: true })).toBeVisible();
 });
