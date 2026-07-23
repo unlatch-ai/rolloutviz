@@ -68,9 +68,12 @@ describe("instrument viewer", () => {
     fireEvent.click(trials);
     expect(screen.getByRole("main", { name: "Browse trajectories" })).toHaveAttribute("data-collection-view", "trials");
     expect(trials).toHaveAttribute("aria-pressed", "true");
-    expect(document.querySelector(".rail-trial-group")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Evaluation summary" })).toBeInTheDocument();
+    expect(document.querySelector(".rail-evaluation-case")).toBeInTheDocument();
+    expect(document.querySelector(".rail-evaluation-variant")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "rollouts" }));
-    expect(document.querySelector(".rail-trial-group")).not.toBeInTheDocument();
+    expect(document.querySelector(".rail-evaluation-case")).not.toBeInTheDocument();
+    expect(document.querySelector(".rail-evaluation-variant")).not.toBeInTheDocument();
   });
 
   it("edits and restores local collection and trajectory metadata", async () => {
@@ -453,8 +456,12 @@ describe("instrument viewer", () => {
     expect(lane).toHaveAttribute("data-fidelity", "detail");
     expect(screen.getByRole("region", { name: "Trajectory shape" })).toHaveTextContent("submit_order");
     expect(screen.getByRole("region", { name: "Trajectory shape" }).querySelectorAll(".timeline-event-label").length).toBeGreaterThan(0);
+    expect(screen.getByRole("region", { name: "Run facts" })).toHaveTextContent(/steps10/);
+    expect(screen.getByRole("region", { name: "Run facts" })).toHaveTextContent(/duration12\.8s/);
     expect(screen.getByRole("region", { name: "Rollout steps" })).toHaveTextContent("submit_order");
     expect(screen.getByRole("region", { name: "Rollout steps" }).querySelectorAll("button")).toHaveLength(sampleTrajectory.events.length);
+    expect(screen.getByRole("region", { name: "Rollout steps" })).toHaveTextContent("52 tok");
+    expect(screen.getByRole("region", { name: "Rollout steps" })).toHaveTextContent("728ms");
     fireEvent.keyDown(window, { key: "[" });
     fireEvent.keyDown(window, { key: "[" });
     expect(lane).toHaveAttribute("data-fidelity", "hairline");
@@ -535,9 +542,13 @@ describe("instrument viewer", () => {
     expect(detail).toHaveAttribute("data-event-count", String(sampleTrajectory.events.length));
     expect(detail.querySelectorAll(".moment")).toHaveLength(sampleTrajectory.events.length);
     const verifier = screen.getByRole("region", { name: "Verifier and outcome" });
+    expect(verifier).toHaveTextContent("Outcome and verifier");
+    expect(verifier).toHaveTextContent(/resultfail/);
+    expect(verifier).toHaveTextContent(/evaluations1/);
     expect(verifier).toHaveTextContent("deterministic state verifier");
     expect(verifier).toHaveTextContent("Update the requested address and submit the order");
     expect(verifier).toHaveTextContent("evt-005, evt-008, evt-009");
+    expect(verifier).toHaveTextContent("open canonical grader event");
     expect(screen.getByRole("main", { name: "Read trajectory" })).toHaveTextContent("checkout-task-verifier");
   });
 

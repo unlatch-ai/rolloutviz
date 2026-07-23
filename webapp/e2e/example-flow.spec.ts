@@ -49,6 +49,12 @@ test("bundled sample opens automatically, keeps guide state, and walks Browse to
   await expect(page.getByRole("article", { name: "RLViz guide" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("region", { name: "RLViz settings" })).toBeVisible();
+  await page.getByRole("button", { name: "trials" }).click();
+  await expect(page.locator(".rail-evaluation-case")).toHaveCount(1);
+  await expect(page.locator(".rail-evaluation-variant")).toHaveCount(2);
+  await expect(page.getByRole("group", { name: "Deliberate · temperature 0.2" })).toContainText("8 rollouts");
+  await expect(page.getByRole("group", { name: "Direct · temperature 0.8" })).toContainText("8 rollouts");
+  await page.getByRole("button", { name: "rollouts" }).click();
   await page.getByRole("article", { name: "RLViz guide" }).getByRole("button", { name: "close" }).click();
   await page.getByRole("region", { name: "RLViz settings" }).getByRole("button", { name: "close" }).click();
   await expect(page.getByRole("article", { name: "RLViz guide" })).toHaveCount(0);

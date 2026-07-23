@@ -165,9 +165,12 @@ The viewer must support:
 
 - collapsed rendering for large model and tool payloads
 - adjustable overview fidelity and semantic depth
+- compact source-backed run facts for model/configuration, outcome, work, resources, and duration
+- per-step tool names and resource facts at maximum overview fidelity
 - a draggable and resizable full-rollout timeline viewport
-- active-module shortcut reference in the docked Guide
+- active-module shortcuts in the persistent bottom keybar and the complete default map in Guide
 - distinct visual treatment for actions, observations, errors, rewards, and grader output
+- outcome-first verifier inspection with structured type, rubric, verdict, reason, and evidence before raw logs
 - raw JSON inspection for every normalized event
 - source file and byte/line location
 - inline text, JSON, image, log, and diff artifacts
@@ -195,6 +198,10 @@ Initial keybindings:
 
 Group support follows the single-trajectory viewer but is represented in the canonical schema from the start.
 
+Collection trial mode follows the canonical evaluation hierarchy: run → case/task
+→ rollout group/variant → trajectory. It never infers an unreported pass or
+failure. Aggregate labels describe only source-backed values.
+
 The first group view includes:
 
 - trajectory table
@@ -204,6 +211,7 @@ The first group view includes:
 - best and worst trajectory shortcuts
 - behavioral path fingerprint
 - sorting and filtering by any signal
+- adapter-declared scalar metrics in group headers
 
 ## Divergence
 

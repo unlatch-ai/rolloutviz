@@ -11,7 +11,7 @@ import type { Episode, StripMark } from "./instrument";
 import type { BrowseResponse, BrowseTrajectory, Trajectory, TrajectoryEvent } from "./types";
 import { preview, title } from "./format";
 import { sampleTrajectory } from "./sample";
-import { applyPresentationTheme } from "./presentation";
+import { applyPresentationTheme, fieldMetadata, formatPresentedScalar, scalarFormat } from "./presentation";
 import type { PresentationConfig } from "./types";
 import { effectiveDepth, laneId, workspaceStorageKey } from "./workspace";
 import type { WorkspaceLane, WorkspaceState } from "./workspace";
@@ -30,7 +30,77 @@ const fidelityNames = ["hairline", "glyphs", "detail"];
 
 function metric(row: BrowseTrajectory, name: string): unknown {
   const metrics = row.metrics.metrics ?? row.metrics.normalized_metrics ?? row.metrics;
-  return metrics[name] ?? row.metrics[name];
+  if (metrics[name] !== undefined) return metrics[name];
+  if (row.metrics[name] !== undefined) return row.metrics[name];
+  return row.metrics.signals?.[name];
+}
+
+function numericMetric(row: BrowseTrajectory, name: string): number | undefined {
+  const value = metric(row, name);
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function rowPass(row: BrowseTrajectory): boolean | undefined {
+  const value = metric(row, "pass") ?? metric(row, "success");
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function rowFailureClass(row: BrowseTrajectory): string | undefined {
+  const value = metric(row, "failure_class");
+  if (typeof value === "string" && value.trim()) return value.trim().toLowerCase();
+  const termination = String(row.trajectory.termination ?? metric(row, "termination") ?? "").toLowerCase();
+  return termination === "infrastructure_error" ? "infrastructure" : undefined;
+}
+
+function rowTimedOut(row: BrowseTrajectory): boolean {
+  return String(row.trajectory.termination ?? metric(row, "termination") ?? "").toLowerCase().includes("timeout");
+}
+
+function compactNumber(value: number): string {
+  return new Intl.NumberFormat("en-US", { notation: Math.abs(value) >= 10_000 ? "compact" : "standard", maximumFractionDigits: value < 10 ? 2 : 1 }).format(value);
+}
+
+function averageMetric(rows: BrowseTrajectory[], name: string): number | undefined {
+  const values = rows.flatMap((row) => { const value = numericMetric(row, name); return value === undefined ? [] : [value]; });
+  return values.length ? values.reduce((total, value) => total + value, 0) / values.length : undefined;
+}
+
+type IndexedBrowseRow = { row: BrowseTrajectory; index: number };
+type EvaluationVariant = { key: string; label: string; rows: IndexedBrowseRow[] };
+type EvaluationCase = { key: string; run: string; label: string; variants: EvaluationVariant[]; rows: IndexedBrowseRow[] };
+
+function evaluationCases(rows: IndexedBrowseRow[]): EvaluationCase[] {
+  const cases = new Map<string, { run: string; label: string; variants: Map<string, EvaluationVariant>; rows: IndexedBrowseRow[] }>();
+  for (const item of rows) {
+    const run = item.row.run_name ?? item.row.source_name ?? "Run";
+    const label = item.row.case_name ?? "Ungrouped task";
+    const caseKey = `${item.row.source_id}:${run}:${label}`;
+    const current = cases.get(caseKey) ?? { run, label, variants: new Map<string, EvaluationVariant>(), rows: [] as IndexedBrowseRow[] };
+    const variantKey = item.row.trajectory.group_id ?? item.row.group_name ?? "ungrouped";
+    const variant = current.variants.get(variantKey) ?? { key: variantKey, label: item.row.group_name ?? "Default variant", rows: [] as IndexedBrowseRow[] };
+    variant.rows.push(item);
+    current.variants.set(variantKey, variant);
+    current.rows.push(item);
+    cases.set(caseKey, current);
+  }
+  return [...cases].map(([key, value]) => ({ key, run: value.run, label: value.label, variants: [...value.variants.values()], rows: value.rows }));
+}
+
+function passSummary(rows: BrowseTrajectory[]): string {
+  const values = rows.map(rowPass);
+  const known = values.filter((value): value is boolean => value !== undefined);
+  if (!known.length) return "outcome not reported";
+  const passed = known.filter(Boolean).length;
+  const unknown = rows.length - known.length;
+  return `${passed}/${known.length} pass${unknown ? ` · ${unknown} unknown` : ""}`;
+}
+
+function configuredMetricSummaries(rows: BrowseTrajectory[], presentation?: PresentationConfig): Array<{ label: string; value: string }> {
+  return (presentation?.group?.columns ?? []).filter((field) => field.startsWith("signal:")).flatMap((field) => {
+    const average = averageMetric(rows, field.slice(7));
+    if (average === undefined) return [];
+    return [{ label: fieldMetadata(presentation, field).label ?? field.slice(7).replace(/[._-]+/g, " "), value: `avg ${formatPresentedScalar(average, scalarFormat(presentation, field))}` }];
+  }).slice(0, 2);
 }
 
 function rowKey(row: BrowseTrajectory): string { return laneId(row.source_id, row.trajectory.id); }
@@ -56,6 +126,32 @@ function eventReward(event: TrajectoryEvent): number | undefined {
   if (typeof event.reward === "number") return event.reward;
   if (event.kind === "reward" && event.data && typeof event.data === "object" && "total" in event.data && typeof event.data.total === "number") return event.data.total;
   return undefined;
+}
+
+function trajectorySignal(trajectory: Trajectory, ...names: string[]): unknown {
+  const wanted = new Set(names.map((name) => name.toLowerCase()));
+  return trajectory.signals?.find((signal) => wanted.has(signal.name.toLowerCase()))?.value;
+}
+
+function trajectoryPass(trajectory: Trajectory): boolean | undefined {
+  const value = trajectorySignal(trajectory, "pass", "success");
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function milliseconds(value: number): string {
+  if (value < 1000) return `${Math.round(value)}ms`;
+  if (value < 60_000) return `${(value / 1000).toFixed(value < 10_000 ? 2 : 1)}s`;
+  return `${Math.floor(value / 60_000)}m ${Math.round((value % 60_000) / 1000)}s`;
+}
+
+function eventResources(event: TrajectoryEvent): string[] {
+  const result: string[] = [];
+  if (event.token_count !== undefined) result.push(`${compactNumber(event.token_count)} tok`);
+  if (event.duration_ms !== undefined) result.push(milliseconds(event.duration_ms));
+  if (event.context?.input_tokens !== undefined) result.push(`${compactNumber(event.context.input_tokens)} ctx`);
+  if (event.context?.capacity !== undefined) result.push(`${compactNumber(event.context.capacity)} cap`);
+  const reward = eventReward(event); if (reward !== undefined) result.push(`r ${compactNumber(reward)}`);
+  return result;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -132,8 +228,9 @@ function CollectionStrip({ row, fidelity }: { row: BrowseTrajectory; fidelity: n
   return <span className="cat-glyphs" style={{ width: `${width}%` }}>{glyphSlots}{fidelity >= 2 && <small>{shape.events} events{errors ? ` · ${errors} errors` : ""}</small>}</span>;
 }
 
-function Rail({ root, rows, workspace, fidelity, metadata, trajectoryMetadata, onMetadata, onActivate, onSelect, onOpen, onAdd, onQuery, onCollectionView }: {
+function Rail({ root, rows, workspace, fidelity, presentation, metadata, trajectoryMetadata, onMetadata, onActivate, onSelect, onOpen, onAdd, onQuery, onCollectionView }: {
   root: RefObject<HTMLElement | null>; rows: BrowseTrajectory[]; workspace: WorkspaceState; fidelity: number;
+  presentation?: PresentationConfig;
   metadata?: EditableMetadata; trajectoryMetadata: Record<string, EditableMetadata>; onMetadata: (value: EditableMetadata) => void;
   onActivate: () => void; onSelect: (index: number) => void; onOpen: () => void; onAdd: () => void; onQuery: (query: string) => void; onCollectionView: (view: WorkspaceState["collectionView"]) => void;
 }) {
@@ -150,11 +247,10 @@ function Rail({ root, rows, workspace, fidelity, metadata, trajectoryMetadata, o
     else if (optionBounds.bottom > listBounds.bottom) list.scrollTop += optionBounds.bottom - listBounds.bottom;
   }, [selected]);
   const indexedRows = rows.map((row, index) => ({ row, index }));
-  const trials = [...indexedRows.reduce((groups, item) => {
-    const label = item.row.case_name ?? item.row.group_name ?? item.row.source_name ?? "Ungrouped";
-    groups.set(label, [...(groups.get(label) ?? []), item]);
-    return groups;
-  }, new Map<string, typeof indexedRows>())];
+  const cases = evaluationCases(indexedRows);
+  const variantCount = cases.reduce((total, item) => total + item.variants.length, 0);
+  const infrastructureFailures = rows.filter((row) => rowFailureClass(row) === "infrastructure").length;
+  const timeouts = rows.filter(rowTimedOut).length;
   const renderRow = ({ row, index }: typeof indexedRows[number]) => <button key={rowKey(row)} role="option" data-index={index} aria-selected={index === selected} data-fidelity-level={`L${fidelity}`} data-columns={fidelity >= 2 ? "true" : "false"} className={`browse-row ${index === selected ? "selected" : ""}`} onClick={() => onSelect(index)} onDoubleClick={onOpen}>
     {fidelity >= 1 && <span className="verdict">{verdictGlyph(row)}</span>}<span className="identity"><b>{trajectoryMetadata[rowKey(row)]?.title ?? row.trajectory.id}</b>{fidelity >= 2 && <small>{trajectoryMetadata[rowKey(row)]?.title ? `${row.trajectory.id}${trajectoryMetadata[rowKey(row)]?.description ? ` · ${trajectoryMetadata[rowKey(row)]?.description}` : ""}` : row.case_name ?? row.group_name ?? row.source_name}</small>}</span><CollectionStrip row={row} fidelity={fidelity} />
     {fidelity >= 2 && <><span className="numeric events-column">{String(metric(row, "event_count") ?? "—")} ev</span><span className="numeric reward-column">{metric(row, "reward") === undefined ? "" : `r ${String(metric(row, "reward"))}`}</span></>}
@@ -163,6 +259,7 @@ function Rail({ root, rows, workspace, fidelity, metadata, trajectoryMetadata, o
   return <main ref={root} tabIndex={0} className={`workspace-rail ${workspace.active === "rail" ? "active-zone" : ""}`} aria-label="Browse trajectories" data-filter={workspace.railQuery} data-fidelity={fidelityNames[fidelity]} data-collection-view={workspace.collectionView} onFocus={onActivate}>
     <header><EditableHeader kind="collection" fallbackTitle="Trajectories" metadata={metadata} context={rows.length === 1 ? "1 trajectory" : `${rows.length} trajectories`} onSave={onMetadata} /></header>
     <div className="rail-controls"><label>Filter <input id="browse-filter" value={workspace.railQuery} onChange={(event) => onQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); root.current?.focus(); } }} /></label><div className="rail-view-toggle" role="group" aria-label="Collection view"><span>view</span><button className={workspace.collectionView === "rollouts" ? "active" : ""} aria-pressed={workspace.collectionView === "rollouts"} onClick={() => onCollectionView("rollouts")}>rollouts</button><button className={workspace.collectionView === "trials" ? "active" : ""} aria-pressed={workspace.collectionView === "trials"} onClick={() => onCollectionView("trials")}>trials</button></div></div>
+    {workspace.collectionView === "trials" && rows.length > 0 && <section className="collection-evaluation-summary" aria-label="Evaluation summary"><span><b>{cases.length}</b><small>task{cases.length === 1 ? "" : "s"}</small></span><span><b>{variantCount}</b><small>variant{variantCount === 1 ? "" : "s"}</small></span><span><b>{passSummary(rows)}</b><small>reported outcomes</small></span>{infrastructureFailures > 0 && <span><b>{infrastructureFailures}</b><small>infrastructure</small></span>}{timeouts > 0 && <span><b>{timeouts}</b><small>timeouts</small></span>}</section>}
     <div className="fidelity-readout">fidelity <b>{fidelityNames[fidelity]}</b> · [ ]</div>
     <section ref={listRef} className={`browse-list rail-fidelity-${fidelity}`} role="listbox" aria-label="Trajectory collection" data-fidelity-level={`L${fidelity}`} onWheel={(event) => {
       const node = event.currentTarget;
@@ -170,7 +267,21 @@ function Rail({ root, rows, workspace, fidelity, metadata, trajectoryMetadata, o
       event.preventDefault();
       node.scrollTop += event.deltaY;
     }}>
-      {workspace.collectionView === "rollouts" ? indexedRows.map(renderRow) : trials.map(([label, items]) => <div key={label} className="rail-trial-group" role="group" aria-label={label}><header><b>{label}</b><small>{items.length} rollout{items.length === 1 ? "" : "s"}</small></header>{items.map(renderRow)}</div>)}
+      {workspace.collectionView === "rollouts" ? indexedRows.map(renderRow) : cases.map((evaluationCase) => <section key={evaluationCase.key} className="rail-evaluation-case" role="group" aria-label={evaluationCase.label}>
+        <header><span><small>{evaluationCase.run}</small><b>{evaluationCase.label}</b></span><span><b>{evaluationCase.rows.length}</b><small>trial{evaluationCase.rows.length === 1 ? "" : "s"}</small></span></header>
+        {evaluationCase.variants.map((variant) => {
+          const variantRows = variant.rows.map(({ row }) => row);
+          const steps = averageMetric(variantRows, "event_count");
+          const tokens = averageMetric(variantRows, "token_count");
+          const custom = configuredMetricSummaries(variantRows, presentation);
+          const infra = variantRows.filter((row) => rowFailureClass(row) === "infrastructure").length;
+          const variantTimeouts = variantRows.filter(rowTimedOut).length;
+          return <div key={variant.key} className="rail-evaluation-variant" role="group" aria-label={variant.label}>
+            <header><span><b>{variant.label}</b><small>{variant.rows.length} rollout{variant.rows.length === 1 ? "" : "s"}</small></span><span className="variant-metrics"><small>{passSummary(variantRows)}</small>{steps !== undefined && <small>avg {compactNumber(steps)} steps</small>}{tokens !== undefined && <small>avg {compactNumber(tokens)} tokens</small>}{infra > 0 && <small>{infra} infra</small>}{variantTimeouts > 0 && <small>{variantTimeouts} timeout{variantTimeouts === 1 ? "" : "s"}</small>}{custom.map((item) => <small key={item.label}>{item.label} {item.value}</small>)}</span></header>
+            {variant.rows.map(renderRow)}
+          </div>;
+        })}
+      </section>)}
       {!rows.length && <p className="empty-state">No trajectories match this filter.</p>}
     </section>
     <span className="rail-actions"><button onClick={onAdd}>add lane</button></span>
@@ -276,11 +387,35 @@ function OverviewSteps({ trajectory, axis, selected, onSelect }: { trajectory: T
     {trajectory.events.map((event, index) => {
       if (event.sequence < axis.start || event.sequence > axis.end) return null;
       const toolNames = eventToolNames(event);
+      const resources = eventResources(event);
       return <button key={event.id} className={index === selected ? "selected" : ""} onClick={() => onSelect(index)}>
-        <span className="address">#{event.sequence}</span><span className="kind-glyph">{glyphForKind(event.kind)}</span><span><small>{event.kind}</small><b>{toolNames.length ? `${toolNames.join(", ")} · ${eventText(event)}` : eventText(event)}</b></span>
+        <span className="address">#{event.sequence}</span><span className="kind-glyph">{glyphForKind(event.kind)}</span><span><small>{event.kind}</small><b>{toolNames.length ? `${toolNames.join(", ")} · ${eventText(event)}` : eventText(event)}</b></span>{resources.length > 0 && <span className="step-resources" aria-label="Step resources">{resources.map((resource) => <small key={resource}>{resource}</small>)}</span>}
       </button>;
     })}
   </section>;
+}
+
+function RunFacts({ trajectory, presentation }: { trajectory: Trajectory; presentation?: PresentationConfig }) {
+  const facts: Array<{ label: string; value: string }> = [];
+  const pass = trajectoryPass(trajectory);
+  const reward = trajectory.total_reward ?? (typeof trajectorySignal(trajectory, "reward") === "number" ? trajectorySignal(trajectory, "reward") as number : undefined);
+  const reportedTokens = trajectorySignal(trajectory, "token_count", "total_tokens", "tokens");
+  if (trajectory.model) facts.push({ label: "model", value: trajectory.model });
+  if (trajectory.group_name ?? trajectory.group_id) facts.push({ label: "variant", value: trajectory.group_name ?? trajectory.group_id! });
+  facts.push({ label: "result", value: pass === undefined ? trajectory.status ?? "not reported" : pass ? "pass" : "fail" });
+  if (reward !== undefined) facts.push({ label: "reward", value: compactNumber(reward) });
+  facts.push({ label: "steps", value: compactNumber(trajectory.events.length) });
+  facts.push({ label: "tools", value: compactNumber(trajectory.events.filter((event) => event.kind === "tool").length) });
+  const errors = trajectory.events.filter((event) => event.kind === "error").length;
+  if (errors > 0) facts.push({ label: "errors", value: compactNumber(errors) });
+  if (typeof reportedTokens === "number" && Number.isFinite(reportedTokens)) facts.push({ label: "tokens", value: compactNumber(reportedTokens) });
+  if (trajectory.duration_ms !== undefined) facts.push({ label: "duration", value: milliseconds(trajectory.duration_ms) });
+  for (const field of (presentation?.group?.columns ?? []).filter((item) => item.startsWith("signal:")).slice(0, 2)) {
+    const value = trajectorySignal(trajectory, field.slice(7));
+    if (typeof value !== "number" && typeof value !== "string" && typeof value !== "boolean") continue;
+    facts.push({ label: fieldMetadata(presentation, field).label ?? field.slice(7).replace(/[._-]+/g, " "), value: formatPresentedScalar(value, scalarFormat(presentation, field)) });
+  }
+  return <section className="run-facts" aria-label="Run facts">{facts.map((fact) => <span key={`${fact.label}:${fact.value}`}><small>{fact.label}</small><b>{fact.value}</b></span>)}</section>;
 }
 
 function AxisNavigator({ trajectory, axis, selected, onChange }: { trajectory: Trajectory; axis: { start: number; end: number }; selected: number; onChange: (axis: { start: number; end: number }) => void }) {
@@ -406,7 +541,7 @@ function LaneTrack({ lane, data, metadata, active, reference, hover, onActivate,
   const outcomes = trajectory ? judgesFor(trajectory).slice(0, 2) : [];
   return <main tabIndex={0} aria-label={lane.band === "focus" ? "Read trajectory" : `Context lane ${lane.trajectoryId}`} className={`lane-track depth-${depth} fidelity-${lane.fidelity} ${lane.band}-lane ${active ? "active-zone" : ""} ${reference ? "reference-lane" : ""}`} data-lane-id={lane.id} data-trajectory={lane.trajectoryId} data-depth={depth} data-stored-depth={lane.depth} data-fidelity={fidelityNames[lane.fidelity]} data-episode={episode?.key ?? ""} data-axis-start={lane.axis.start.toFixed(4)} data-axis-end={lane.axis.end.toFixed(4)} onFocus={onActivate} onClick={onActivate}>
     <header><span title={lane.trajectoryId}><b>{metadata?.title ?? lane.trajectoryId}</b>{metadata?.description && <small>{metadata.description}</small>}{reference && <small>reference</small>}</span>{outcomes.length > 0 && <span className="lane-outcome" aria-label="Rollout outcome">{outcomes.map((outcome) => <small key={outcome.label}><i>{outcome.label}</i> {outcome.value}</small>)}</span>}<span className="lane-state">{["", "overview", "episodes", "events", "raw"][depth]}{depth === 1 ? ` · ${fidelityNames[lane.fidelity]} · [ ]` : ""}</span></header>
-    <div className="lane-body">{!trajectory ? <div className="lane-loading">loading trajectory…</div> : depth === 1 ? <><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} fidelity={lane.fidelity} compact={lane.band === "context"} label={lane.band === "focus" ? "Trajectory shape" : `Trajectory shape ${lane.trajectoryId}`} onSelect={onSelect} onHover={onHover} />{lane.fidelity === 2 && lane.band === "focus" && <OverviewSteps trajectory={trajectory} axis={lane.axis} selected={selected} onSelect={onSelect} />}</> : depth === 2 ? <EpisodeStrip trajectory={trajectory} lane={lane} episodes={episodes} selectedEpisode={selectedEpisode} onDescend={(target) => onDescend(target)} /> : <><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} compact label="Compressed trajectory shape" onSelect={onSelect} onHover={onHover} onAscend={onAscend} />{depth === 3 && episode && <ScopedEvents trajectory={trajectory} episode={episode} selected={selected} onSelect={onSelect} />}{depth === 4 && trajectory.events[selected] && <SourceRecord event={trajectory.events[selected]} />}</>}</div>
+    <div className="lane-body">{!trajectory ? <div className="lane-loading">loading trajectory…</div> : depth === 1 ? <><RunFacts trajectory={trajectory} presentation={data?.presentation} /><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} fidelity={lane.fidelity} compact={lane.band === "context"} label={lane.band === "focus" ? "Trajectory shape" : `Trajectory shape ${lane.trajectoryId}`} onSelect={onSelect} onHover={onHover} />{lane.fidelity === 2 && lane.band === "focus" && <OverviewSteps trajectory={trajectory} axis={lane.axis} selected={selected} onSelect={onSelect} />}</> : depth === 2 ? <EpisodeStrip trajectory={trajectory} lane={lane} episodes={episodes} selectedEpisode={selectedEpisode} onDescend={(target) => onDescend(target)} /> : <><ShapeStrip trajectory={trajectory} selected={selected} hover={hover} axis={lane.axis} compact label="Compressed trajectory shape" onSelect={onSelect} onHover={onHover} onAscend={onAscend} />{depth === 3 && episode && <ScopedEvents trajectory={trajectory} episode={episode} selected={selected} onSelect={onSelect} />}{depth === 4 && trajectory.events[selected] && <SourceRecord event={trajectory.events[selected]} />}</>}</div>
     {trajectory && <AxisNavigator trajectory={trajectory} axis={lane.axis} selected={selected} onChange={onAxisChange} />}
     {trajectory && hover !== undefined && depth === 1 && lane.band === "focus" && <aside className="skim-preview" role="status"><b>#{trajectory.events[hover].sequence} · {trajectory.events[hover].kind}</b><span>{eventText(trajectory.events[hover])}</span></aside>}
   </main>;
@@ -442,13 +577,23 @@ function verifiersFor(trajectory: Trajectory): Array<{ event: TrajectoryEvent; n
 
 function VerifierSummary({ trajectory, onSelect }: { trajectory: Trajectory; onSelect: (index: number) => void }) {
   const verifiers = verifiersFor(trajectory);
-  if (!verifiers.length) return null;
+  const pass = trajectoryPass(trajectory);
+  const reward = trajectory.total_reward ?? trajectorySignal(trajectory, "reward");
+  const failureClass = trajectorySignal(trajectory, "failure_class");
+  const outcomeFacts = [
+    { label: "result", value: pass === undefined ? trajectory.status ?? "not reported" : pass ? "pass" : "fail", tone: pass === true ? "success" : pass === false ? "failure" : "" },
+    trajectory.termination ? { label: "termination", value: trajectory.termination, tone: trajectory.termination === "infrastructure_error" ? "infrastructure" : "" } : undefined,
+    typeof reward === "number" || typeof reward === "string" ? { label: "reward", value: String(reward), tone: "" } : undefined,
+    typeof failureClass === "string" ? { label: "failure class", value: failureClass, tone: failureClass.toLowerCase().includes("infra") ? "infrastructure" : "failure" } : undefined,
+    { label: "evaluations", value: String(verifiers.length), tone: "" },
+  ].filter((fact): fact is { label: string; value: string; tone: string } => !!fact);
   return <section className="verifier-summary" aria-label="Verifier and outcome">
-    <header><b>Verifier and outcome</b><small>{verifiers.length} recorded evaluation{verifiers.length === 1 ? "" : "s"}</small></header>
-    {verifiers.map(({ event, name, type, rubric, verdict, score, reason, evidence }) => <button key={event.id} onClick={() => onSelect(trajectory.events.indexOf(event))}>
+    <header><b>Outcome and verifier</b><small>source-backed evaluation context</small></header>
+    <div className="outcome-facts">{outcomeFacts.map((fact) => <span key={fact.label} className={fact.tone}><small>{fact.label}</small><b>{fact.value}</b></span>)}</div>
+    {verifiers.length > 0 ? <div className="verifier-list">{verifiers.map(({ event, name, type, rubric, verdict, score, reason, evidence }) => <button key={event.id} onClick={() => onSelect(trajectory.events.indexOf(event))}>
       <span className="verifier-result"><small>{type ?? "verifier"}</small><strong>{verdict ?? "recorded"}{score ? ` · ${score}` : ""}</strong></span>
-      <span><b>{name}</b>{rubric && <small><i>Rubric</i>{rubric}</small>}{reason && <small><i>Reason</i>{reason}</small>}{evidence.length > 0 && <small><i>Evidence</i>{evidence.join(", ")}</small>}</span>
-    </button>)}
+      <span><b>{name}</b>{rubric && <small><i>Rubric</i>{rubric}</small>}{reason && <small><i>Reason</i>{reason}</small>}{evidence.length > 0 && <small><i>Evidence</i>{evidence.join(", ")}</small>}<em>open canonical grader event</em></span>
+    </button>)}</div> : <p className="verifier-missing">No structured grader event was provided by this adapter.</p>}
   </section>;
 }
 
@@ -757,7 +902,7 @@ export function App({ initialTrajectory, provider = daemonProvider, setup = { mo
     : shortcutIDs.map((id) => ({ binding: firstBindingLabel(id), label: commandDefinition(id).label, id }));
 
   const dockContent: DockContent = {
-    collection: <Rail root={railRef} rows={filtered} workspace={{ ...workspace, railSelected: boundedRail }} fidelity={railFidelity} metadata={viewerMetadata.collections[collectionKey]} trajectoryMetadata={viewerMetadata.trajectories} onMetadata={(value) => updateCollection(collectionKey, value)} onActivate={() => { if (canActivateContent("rail")) change((current) => ({ ...current, active: "rail" })); }} onSelect={(index) => change((current) => ({ ...current, railSelected: index, active: "rail" }))} onOpen={() => openSelected(false)} onAdd={() => openSelected(true)} onCollectionView={(collectionView) => change((current) => ({ ...current, collectionView }))} onQuery={(railQuery) => change((current) => { const next = ordered.filter((row) => !railQuery || rowSearchText(row, viewerMetadata.trajectories[rowKey(row)]).includes(railQuery.toLowerCase())); const kept = selectedRow ? next.findIndex((row) => rowKey(row) === rowKey(selectedRow)) : -1; return { ...current, railQuery, railSelected: kept >= 0 ? kept : 0 }; })} />,
+    collection: <Rail root={railRef} rows={filtered} workspace={{ ...workspace, railSelected: boundedRail }} fidelity={railFidelity} presentation={presentation} metadata={viewerMetadata.collections[collectionKey]} trajectoryMetadata={viewerMetadata.trajectories} onMetadata={(value) => updateCollection(collectionKey, value)} onActivate={() => { if (canActivateContent("rail")) change((current) => ({ ...current, active: "rail" })); }} onSelect={(index) => change((current) => ({ ...current, railSelected: index, active: "rail" }))} onOpen={() => openSelected(false)} onAdd={() => openSelected(true)} onCollectionView={(collectionView) => change((current) => ({ ...current, collectionView }))} onQuery={(railQuery) => change((current) => { const next = ordered.filter((row) => !railQuery || rowSearchText(row, viewerMetadata.trajectories[rowKey(row)]).includes(railQuery.toLowerCase())); const kept = selectedRow ? next.findIndex((row) => rowKey(row) === rowKey(selectedRow)) : -1; return { ...current, railQuery, railSelected: kept >= 0 ? kept : 0 }; })} />,
     guide: <Guide active={workspace.active === "guide"} setup={setup} onActivate={() => { if (canActivateContent("guide")) change((current) => ({ ...current, active: "guide" })); }} onClose={() => change((current) => ({ ...current, guideOpen: false, active: current.active === "guide" ? lastGuideTarget.current : current.active }))} />,
     settings: <Settings active={workspace.active === "settings"} theme={theme} setup={setup} onTheme={setTheme} onActivate={() => { if (canActivateContent("settings")) change((current) => ({ ...current, active: "settings" })); }} onClose={() => change((current) => ({ ...current, settingsOpen: false, active: current.active === "settings" ? lastSettingsTarget.current : current.active }))} />,
     lane: (id) => { const lane = workspace.lanes.find((item) => item.id === id); return lane ? <LaneTrack lane={lane} data={laneData.get(lane.id)} metadata={viewerMetadata.trajectories[lane.id]} active={workspace.active === lane.id} reference={workspace.reference === lane.id} hover={hover[lane.id]} onActivate={() => { if (canActivateContent(lane.id)) change((current) => ({ ...current, active: lane.id })); }} onSelect={(value) => selectEvent(lane.id, value)} onHover={(value) => setHover((current) => ({ ...current, [lane.id]: value }))} onDescend={(episode) => descendLane(lane.id, episode)} onAscend={() => ascendLane(lane.id)} onAxisChange={(axis) => updateLane(lane.id, (current) => ({ ...current, axis }), false)} /> : null; },

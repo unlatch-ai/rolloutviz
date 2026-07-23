@@ -136,7 +136,10 @@ test("theme control switches computed high-contrast palette values", async ({ pa
 test("collection trial groups keep rollout options and the keybar in view", async ({ page }) => {
   await page.getByRole("button", { name: "trials" }).click();
   await expect(page.getByRole("main", { name: "Browse trajectories" })).toHaveAttribute("data-collection-view", "trials");
-  await expect(page.getByRole("group", { name: "policy demo" })).toContainText("3 rollouts");
+  await expect(page.locator(".collection-evaluation-summary")).toHaveAttribute("aria-label", "Evaluation summary");
+  await expect(page.locator(".rail-evaluation-case")).toHaveCount(1);
+  await expect(page.locator(".rail-evaluation-variant")).toHaveCount(1);
+  await expect(page.locator(".rail-evaluation-variant")).toContainText("3 rollouts");
   await expect(page.getByRole("option")).toHaveCount(3);
   const layout = await page.locator(".workspace-rack").evaluate((rack) => {
     const keybar = rack.querySelector(".keybar")!.getBoundingClientRect();
