@@ -189,7 +189,7 @@ Initial keybindings:
 | `/` | Search |
 | `e` | Next error |
 | `r` | Next reward or grader event |
-| `x` | Close active lane |
+| `x` | Close active module |
 | `o` | Open selected artifact |
 | `m` | Show trajectory metadata |
 | `?` | Show keybindings |

@@ -242,9 +242,11 @@ describe("Browse Read Compare flow", () => {
 		// `a` piles lanes in while focus stays in the collection.
 		fireEvent.keyDown(window, { key: "Tab" }); fireEvent.keyDown(window, { key: "Tab" }); fireEvent.keyDown(window, { key: "j" }); fireEvent.keyDown(window, { key: "a" });
 		await waitFor(() => expect(screen.getAllByRole("main", { name: "Read trajectory" })).toHaveLength(2));
+		expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", "rail");
 		// add keeps the collection focused, so the next add needs no Tab round-trip
 		fireEvent.keyDown(window, { key: "j" }); fireEvent.keyDown(window, { key: "a" });
 		await screen.findByRole("main", { name: "Context lane third" });
+		expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", "rail");
 		fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
 		fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
 		fireEvent.keyDown(window, { key: "n" });

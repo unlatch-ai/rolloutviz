@@ -28,19 +28,19 @@ describe("instrument viewer", () => {
 
   it("renders the three-level fidelity ladder with truthful strips", () => {
     render(<App initialTrajectory={sampleTrajectory} />);
-    // default: glyphs — the sample provider carries no shape summary, so the
-    // strip must degrade to length + counts, never synthetic texture.
-    expect(screen.getByText("glyphs", { selector: ".fidelity-readout b" })).toBeInTheDocument();
+    // Collection modes name the information shown, rather than the rendering
+    // primitive used to draw it.
+    expect(screen.getByText("signals", { selector: ".fidelity-readout b" })).toBeInTheDocument();
     expect(document.querySelector(".cat-texture")).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: "]" });
-    expect(screen.getByText("detail", { selector: ".fidelity-readout b" })).toBeInTheDocument();
+    expect(screen.getByText("summary", { selector: ".fidelity-readout b" })).toBeInTheDocument();
     expect(document.querySelector("[data-columns='true']")).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "]" });
-    expect(screen.getByText("detail", { selector: ".fidelity-readout b" })).toBeInTheDocument();
+    expect(screen.getByText("summary", { selector: ".fidelity-readout b" })).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "[" });
     fireEvent.keyDown(window, { key: "[" });
-    expect(screen.getByText("hairline", { selector: ".fidelity-readout b" })).toBeInTheDocument();
-    expect(document.querySelector(".cat-line")).toBeInTheDocument();
+    expect(screen.getByText("compact", { selector: ".fidelity-readout b" })).toBeInTheDocument();
+    expect(document.querySelector(".collection-signals")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "table" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "caterpillars" })).not.toBeInTheDocument();
   });
@@ -233,18 +233,52 @@ describe("instrument viewer", () => {
     expect(document.documentElement).toHaveAttribute("data-theme", "light");
   });
 
-  it("opens browser visitors on the overview with installation commands and data actions", () => {
+  it("opens browser visitors on a concise overview with header links and copyable commands", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
     render(<App initialTrajectory={sampleTrajectory} setup={{ mode: "browser" }} />);
     expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("Welcome to RLViz");
     expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("Please read");
     expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("Inspect AI EvalLog JSON");
+    expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("We highly recommend installing the local CLI");
+    expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("Coding agents can operate its workspaces and build adapters or plugins");
     expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("brew install TheSnakeFang/tap/rlviz");
+    expect(screen.getByRole("article", { name: "RLViz guide" })).not.toHaveTextContent("The sample checkout cohort around this Guide");
     expect(screen.getByRole("button", { name: "Open trace directory" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "rlviz.dev" })).toHaveAttribute("href", "https://rlviz.dev");
     expect(screen.getByRole("link", { name: "Repo" })).toHaveAttribute("href", "https://github.com/TheSnakeFang/rlviz");
     expect(screen.getByRole("link", { name: "Created by Kevin Fang" })).toHaveAttribute("href", "https://x.com/sofangtastic");
     expect(document.querySelectorAll(".guide-link img, .guide-link svg")).toHaveLength(3);
+    expect(screen.getByRole("navigation", { name: "RLViz links" })).toContainElement(screen.getByRole("link", { name: "Repo" }));
+    expect(document.querySelector(".workspace-guide > header > span")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy command" })[0]);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("brew install TheSnakeFang/tap/rlviz"));
+    expect(screen.getAllByRole("button", { name: "Copy command" })[0]).toHaveTextContent("copied");
+  });
+
+  it("spotlights a rollout and restores the previous workspace with the same shortcut", async () => {
+    await openRead();
+    const shell = document.querySelector(".instrument-shell");
+    const lane = screen.getByRole("main", { name: "Read trajectory" });
+    const laneID = lane.getAttribute("data-lane-id");
+    expect(screen.getByRole("article", { name: "RLViz guide" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "RLViz settings" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "z" });
+    expect(shell).toHaveAttribute("data-spotlight", "true");
+    expect(shell).toHaveAttribute("data-spotlight-lane", laneID);
+    expect(screen.queryByRole("article", { name: "RLViz guide" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "RLViz settings" })).not.toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "Browse trajectories" })).toHaveAttribute("data-fidelity", "compact");
+    expect(screen.getByRole("region", { name: "Active module shortcuts" })).toHaveTextContent("Toggle rollout spotlight");
+    const sharedWhileSpotlit = JSON.parse(new URLSearchParams(window.location.search).get("workspace")!);
+    expect(sharedWhileSpotlit.guideOpen).toBe(true);
+    expect(sharedWhileSpotlit.settingsOpen).toBe(true);
+    fireEvent.keyDown(window, { key: "z" });
+    expect(shell).toHaveAttribute("data-spotlight", "false");
+    expect(await screen.findByRole("article", { name: "RLViz guide" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "RLViz settings" })).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "Browse trajectories" })).toHaveAttribute("data-fidelity", "signals");
   });
 
   it("restores the active rollout after closing Guide or Settings", async () => {
@@ -259,6 +293,27 @@ describe("instrument viewer", () => {
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", laneID);
     fireEvent.keyDown(window, { key: "S", shiftKey: true });
     fireEvent.keyDown(window, { key: "S", shiftKey: true });
+    expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", laneID);
+  });
+
+  it("closes the active Guide or Settings module with x", async () => {
+    render(<App initialTrajectory={sampleTrajectory} />);
+    fireEvent.click(screen.getByRole("article", { name: "RLViz guide" }).querySelector("button")!);
+    fireEvent.click(screen.getByRole("region", { name: "RLViz settings" }).querySelector("button")!);
+    fireEvent.keyDown(window, { key: "Enter" });
+    const lane = await screen.findByRole("main", { name: "Read trajectory" });
+    const laneID = lane.getAttribute("data-lane-id");
+
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.getByRole("region", { name: "Active module shortcuts" })).toHaveTextContent("xClose active module");
+    fireEvent.keyDown(window, { key: "x" });
+    expect(screen.queryByRole("article", { name: "RLViz guide" })).not.toBeInTheDocument();
+    expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", laneID);
+
+    fireEvent.keyDown(window, { key: "S", shiftKey: true });
+    expect(screen.getByRole("region", { name: "Active module shortcuts" })).toHaveTextContent("xClose active module");
+    fireEvent.keyDown(window, { key: "x" });
+    expect(screen.queryByRole("region", { name: "RLViz settings" })).not.toBeInTheDocument();
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", laneID);
   });
 
@@ -295,7 +350,7 @@ describe("instrument viewer", () => {
 	expect(screen.getByText("raw")).toBeInTheDocument();
 	expect(screen.getByRole("region", { name: "Event source" })).toBeInTheDocument();
 	fireEvent.keyDown(window, { key: "Escape" });
-	expect(screen.getByText("events")).toBeInTheDocument();
+  expect(document.querySelector(".lane-state")).toHaveTextContent("events");
 	fireEvent.keyDown(window, { key: "Escape" });
 	expect(screen.getByText("episodes")).toBeInTheDocument();
 	fireEvent.keyDown(window, { key: "Escape" });
@@ -448,14 +503,42 @@ describe("instrument viewer", () => {
     expect(await screen.findByRole("region", { name: "Workspace console" })).toHaveAttribute("data-dock-position", "bottom");
   });
 
+  it("uses unmodified arrow keys to navigate spatially between open modules", async () => {
+    await openRead();
+    const lane = screen.getByRole("main", { name: "Read trajectory" });
+    expect(lane).toHaveFocus();
+    const event = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("resets a changed workspace to the default welcome setup", async () => {
+    const view = render(<App initialTrajectory={sampleTrajectory} />);
+    fireEvent.keyDown(window, { key: "Enter" });
+    await screen.findByRole("main", { name: "Read trajectory" });
+    fireEvent.keyDown(window, { key: "?" });
+    fireEvent.keyDown(window, { key: "S", shiftKey: true });
+    fireEvent.keyDown(window, { key: "m", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "R", shiftKey: true });
+    await waitFor(() => expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-active-zone", "guide"));
+    expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-move-mode", "false");
+    expect(screen.getByRole("article", { name: "RLViz guide" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "RLViz settings" })).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "Browse trajectories" })).toHaveAttribute("data-fidelity", "signals");
+    view.unmount();
+  });
+
   it("changes overview fidelity in the active lane and names every visible step at detail fidelity", async () => {
     await openRead();
     const lane = screen.getByRole("main", { name: "Read trajectory" });
     expect(lane).toHaveAttribute("data-fidelity", "glyphs");
     fireEvent.keyDown(window, { key: "]" });
     expect(lane).toHaveAttribute("data-fidelity", "detail");
-    expect(screen.getByRole("region", { name: "Trajectory shape" })).toHaveTextContent("submit_order");
+    expect(screen.getByRole("region", { name: "Trajectory shape" })).toHaveTextContent("get_order");
+    expect(screen.getByRole("region", { name: "Trajectory shape" }).querySelector("svg")).toHaveAttribute("data-label-density");
     expect(screen.getByRole("region", { name: "Trajectory shape" }).querySelectorAll(".timeline-event-label").length).toBeGreaterThan(0);
+    expect(screen.getByRole("region", { name: "Trajectory shape" }).querySelector(".tool-success")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Trajectory shape" }).querySelector(".tool-failure")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Run facts" })).toHaveTextContent(/steps10/);
     expect(screen.getByRole("region", { name: "Run facts" })).toHaveTextContent(/duration12\.8s/);
     expect(screen.getByRole("region", { name: "Rollout steps" })).toHaveTextContent("submit_order");
@@ -513,7 +596,7 @@ describe("instrument viewer", () => {
         kind: index === 555 ? "error" : index % 100 === 0 ? "tool" : "message",
       })),
     };
-    render(<App initialTrajectory={trajectory} />);
+    const view = render(<App initialTrajectory={trajectory} />);
     fireEvent.keyDown(window, { key: "Enter" });
     await screen.findByRole("main", { name: "Read trajectory" });
     const timeline = screen.getByLabelText("Timeline overview");
@@ -521,6 +604,7 @@ describe("instrument viewer", () => {
     expect(Number(timeline.getAttribute("data-axis-nodes"))).toBeLessThan(500);
     expect(timeline.querySelectorAll(".axis-mark.tool").length).toBeGreaterThan(0);
     expect(timeline.querySelector(".axis-mark.error.selected")).toBeInTheDocument();
+    view.unmount();
   });
 
   it("opens a rollout-pinned detail module whose navigation acts on that rollout", async () => {
