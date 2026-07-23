@@ -3,6 +3,10 @@
 .browser-app.viewer-open > .instrument-shell, .browser-app.viewer-open .instrument { height: 100%; min-height: 0; overflow: hidden; }
 .browser-app.viewer-open .workspace-rack { height: 100%; min-height: 0; }
 .viewer-loading { display: grid; place-items: center; min-height: 0; color: var(--ink-secondary); font: 12px ui-monospace, monospace; }
+.viewer-boot { width: 100%; height: 100%; display: grid; grid-template-columns: 22% 43% 35%; gap: 1px; background: var(--hairline); overflow: hidden; }
+.viewer-boot > span { position: relative; display: block; background: var(--surface); }
+.viewer-boot > span::before { content: ""; position: absolute; inset: 30px 14px auto; height: 1px; background: var(--hairline); }
+.viewer-boot > span:nth-child(2)::after { content: ""; position: absolute; right: 0; bottom: 34px; left: 0; height: 1px; background: var(--hairline); }
 .landing { min-height: calc(100vh - 48px); padding: 0 5vw 72px; background: var(--page); }
 .landing.dragging { box-shadow: inset 0 0 0 3px var(--ctx); }
 .landing nav, .viewer-bar { display: flex; align-items: center; justify-content: space-between; min-height: 64px; border-bottom: 1px solid var(--hairline); }

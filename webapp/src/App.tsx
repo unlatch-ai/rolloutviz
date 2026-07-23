@@ -7,7 +7,8 @@ import { adapterIdentity, runAdapter } from "./adapter";
 import { createInMemoryProvider } from "./provider";
 import { limits, parseTrace } from "./wasm";
 
-const Viewer = lazy(() => import("../../web/src/App").then(({ App }) => ({ default: App })));
+const viewerModule = import("../../web/src/App");
+const Viewer = lazy(() => viewerModule.then(({ App }) => ({ default: App })));
 const examples = [
   ["300-event coding trace", "coding-agent-bugfix.ndjson", codingExample],
   ["web research trace", "web-research-agent.ndjson", researchExample],
@@ -39,6 +40,7 @@ interface PendingAdapter {
 
 export function BrowserApp() {
   const [provider, setProvider] = useState<ViewerProvider>();
+  const [bootstrapping, setBootstrapping] = useState(true);
   const [activeSample, setActiveSample] = useState("checkout-cohort.ndjson");
   const [source, setSource] = useState<{ bytes: Uint8Array; name: string }>();
   const [status, setStatus] = useState("Ready for a canonical, Inspect AI, or Verifiers trace.");
@@ -88,7 +90,7 @@ export function BrowserApp() {
   useEffect(() => {
     if (autoLoaded.current) return;
     autoLoaded.current = true;
-    void openExample(cohortExample, "checkout-cohort.ndjson");
+    void openExample(cohortExample, "checkout-cohort.ndjson").finally(() => setBootstrapping(false));
   }, []);
 
   useEffect(() => { directoryInput.current?.setAttribute("webkitdirectory", ""); }, []);
@@ -128,9 +130,9 @@ export function BrowserApp() {
     <input ref={adapterInput} hidden type="file" accept=".wasm,application/wasm" onChange={(event) => void chooseAdapter(event.target.files?.[0])} />
   </>;
 
-  return <div className={`browser-app ${provider ? "viewer-open" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); void openFile(event.dataTransfer.files[0]); }}>
+  return <div className={`browser-app ${provider || bootstrapping ? "viewer-open" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); void openFile(event.dataTransfer.files[0]); }}>
     {picker}
-    {!provider ? <main className={`landing ${dragging ? "dragging" : ""}`}>
+    {!provider ? bootstrapping ? <div className="viewer-boot" role="status" aria-label="Loading RLViz"><span /><span /><span /></div> : <main className={`landing ${dragging ? "dragging" : ""}`}>
       <nav><a className="wordmark" href="/">RLViz</a><div className="landing-links"><a href="/docs.html">docs</a><a href="https://github.com/TheSnakeFang/rlviz">GitHub</a><button onClick={() => setHelp(true)}>adapter help</button></div></nav>
       <section className="hero">
         <p className="kicker">Browser viewer · local files only</p>

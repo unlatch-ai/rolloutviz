@@ -3,6 +3,28 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+test("first paint stays on the viewer shell while the bundled cohort is delayed", async ({ page }) => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
+  const contentTypes: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".ndjson": "application/x-ndjson" };
+  let releaseSample: (() => void) | undefined;
+  const sampleReady = new Promise<void>((resolve) => { releaseSample = resolve; });
+  await page.route("**/*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.origin !== "http://127.0.0.1:4174") return route.abort();
+    const relative = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
+    if (relative.includes("checkout-cohort")) await sampleReady;
+    try { await route.fulfill({ body: await readFile(path.join(root, relative)), contentType: contentTypes[path.extname(relative)] ?? "application/octet-stream" }); }
+    catch { await route.fulfill({ status: 404, body: "not found" }); }
+  });
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("status", { name: "Loading RLViz" })).toBeVisible();
+  await expect(page.getByText("Inspect agent rollouts locally.")).toHaveCount(0);
+  releaseSample?.();
+  await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Inspect agent rollouts locally.")).toHaveCount(0);
+});
+
 test("bundled sample opens automatically, keeps guide state, and walks Browse to Read", async ({ page }) => {
   const requests: Array<{ url: string; method: string; body: string | null }> = [];
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
@@ -21,6 +43,7 @@ test("bundled sample opens automatically, keeps guide state, and walks Browse to
   });
 
   await page.goto("/");
+  await expect(page.getByText("Inspect agent rollouts locally.")).toHaveCount(0);
   await expect(page.getByRole("main", { name: "Browse trajectories" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("main", { name: "Browse trajectories" }).getByRole("option").first()).toContainText("checkout-rollout-01");
   await expect(page.getByRole("article", { name: "RLViz guide" })).toBeVisible();
