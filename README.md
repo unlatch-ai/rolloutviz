@@ -1,10 +1,17 @@
 # RLViz
 
+[![CI](https://github.com/TheSnakeFang/rlviz/actions/workflows/ci.yml/badge.svg)](https://github.com/TheSnakeFang/rlviz/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/TheSnakeFang/rlviz)](https://github.com/TheSnakeFang/rlviz/releases/latest)
+[![npm](https://img.shields.io/npm/v/rlviz)](https://www.npmjs.com/package/rlviz)
+[![License](https://img.shields.io/github/license/TheSnakeFang/rlviz)](LICENSE)
+
 Inspect agent rollouts locally.
 
 RLViz opens existing agent traces in a keyboard-first viewer. Read each model,
 tool, environment, grader, and artifact event; compare trajectories; and trace
 normalized data back to its raw source record. The source is never modified.
+
+![RLViz default workspace](webapp/public/rlviz-social.png)
 
 Open a supported file directly at [rlviz.dev](https://rlviz.dev). Parsing and
 indexing stay in the browser tab. Use the CLI for larger traces, growing files,
