@@ -16,6 +16,22 @@ test.beforeEach(async ({ page }) => {
     try { await route.fulfill({ body: await readFile(path.join(root, relative)), contentType: contentTypes[path.extname(relative)] ?? "application/octet-stream", headers: securityHeaders }); }
     catch { await route.fulfill({ status: 404, body: "not found" }); }
   });
+  // Product onboarding intentionally starts with two rollouts. Shared flow
+  // tests seed the older empty workspace explicitly so each action owns the
+  // lane count and selection it asserts.
+  await page.addInitScript(() => localStorage.setItem("rlviz.workspace.v5", JSON.stringify({
+    version: 3,
+    railExpanded: true,
+    railQuery: "",
+    railSelected: 0,
+    collectionView: "rollouts",
+    guideOpen: true,
+    settingsOpen: true,
+    lanes: [],
+    details: [],
+    direction: "rows",
+    active: "rail",
+  })));
   await page.goto("/");
 });
 

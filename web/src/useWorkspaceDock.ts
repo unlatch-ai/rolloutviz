@@ -234,6 +234,29 @@ export function useWorkspaceDock({
     });
   }, [change, dockDetail, flushPersistence, workspaceRef]);
 
+  const arrangeWelcomeLayout = useCallback(() => {
+    let attempts = 0;
+    const arrange = () => {
+      const api = apiRef.current;
+      const lanes = workspaceRef.current.lanes.slice(0, 2).map((lane) => api?.getPanel(lanePanelId(lane.id)));
+      const collection = api?.getPanel("collection"), guide = api?.getPanel("guide"), detail = api?.getPanel("detail"), settings = api?.getPanel("settings");
+      if (!api || !collection || !guide || !detail || !settings || lanes.some((lane) => !lane)) {
+        if (++attempts < 8) requestAnimationFrame(arrange);
+        return;
+      }
+      guide.api.moveTo({ group: collection.api.group, position: "right" });
+      lanes[0]!.api.moveTo({ group: guide.api.group, position: "right" });
+      detail.api.moveTo({ group: lanes[0]!.api.group, position: "right" });
+      lanes[1]!.api.moveTo({ group: lanes[0]!.api.group, position: "bottom" });
+      settings.api.moveTo({ group: detail.api.group, position: "bottom" });
+      collection.api.group.api.setSize({ width: Math.max(240, Math.round(api.width * 0.22)) });
+      guide.api.group.api.setSize({ width: Math.max(360, Math.round(api.width * 0.34)) });
+      setDetailPosition("right");
+      requestAnimationFrame(() => flushPersistence(api));
+    };
+    requestAnimationFrame(arrange);
+  }, [flushPersistence, workspaceRef]);
+
   const moveActiveModule = useCallback((key: string) => {
     const api = apiRef.current;
     const panel = api?.activePanel;
@@ -292,6 +315,7 @@ export function useWorkspaceDock({
     onReady,
     persistLayout,
     arrangeLanes,
+    arrangeWelcomeLayout,
     moveActiveModule,
     resizeNearest,
     activateTarget,

@@ -5,6 +5,7 @@ export type ViewerSetup = {
   selectedSample?: string;
   onSample?: (value: string) => void;
   onOpenTrace?: () => void;
+  onOpenDirectory?: () => void;
   onOpenAdapter?: () => void;
   onAdapterHelp?: () => void;
 };

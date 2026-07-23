@@ -98,10 +98,10 @@ the source trace or become part of a shared workspace URL.
 
 ## 4. Keys: one source, active-module scope
 
-The docked Guide renders the **active module's actual bindings** from the
-command registry. `?` opens or closes Guide and restores the module that
-invoked it. The fixed bottom bar is removed so it cannot cover content or
-consume viewport height. Every live binding remains discoverable in Guide.
+The fixed bottom bar renders the **active module's actual bindings** from the
+command registry without covering module content. The Guide contains the full
+default keybinding reference, not transient active-module state. `?` opens or
+closes Guide and restores the module that invoked it.
 
 ## 5. Settings, onboarding, and agents
 

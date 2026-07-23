@@ -21,4 +21,4 @@ The GUI is the only trajectory display. Collection, rollout, Detail, Guide, and 
 - `Tab` / `Shift+Tab` cycle modules. `Alt` plus an arrow activates the spatial neighbor.
 - `Ctrl+m` toggles module move mode. `Ctrl+w` toggles seam resize mode. The same chord or `Escape` exits.
 - `?` toggles Guide. `Shift+S` toggles Settings.
-- Guide shows the active module's current shortcuts at the top. Remapped bindings are reflected there.
+- The bottom bar shows the active module's current shortcuts. Guide includes the full default keybinding reference.

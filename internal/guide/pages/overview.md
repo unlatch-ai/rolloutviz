@@ -1,16 +1,40 @@
-# What RLViz does
+# Welcome to RLViz
 
-RLViz is an open-source viewer for agent rollouts. It reads traces from runs that already happened and shows the model, tool calls, environment observations, graders, rewards, errors, and source provenance in one local workspace.
+RLViz is an open-source viewer for agent rollouts. It puts model output, tool calls, environment observations, graders, rewards, errors, and source provenance into one local workspace.
 
-Use it when raw JSON is too slow to inspect and a custom notebook would repeat work the viewer already knows how to do.
+The sample checkout cohort around this Guide is the live product. Open its rollouts, move between events, adjust the timeline, and change the layout before installing anything.
 
-## Product boundary
+## Install the local CLI
 
-- RLViz visualizes, navigates, filters, groups, and compares trajectories.
-- It does not run agents, replay recorded tools, train models, manage prompts, or provide hosted monitoring.
-- Source traces remain read-only. Browser parsing stays in the tab; CLI viewing stays on loopback.
+Homebrew:
 
-## Two ways to use it
+```sh
+brew install TheSnakeFang/tap/rlviz
+```
 
-- **Browser:** open `https://rlviz.dev`, use the synthetic cohort immediately, or select a supported local file. Nothing is installed and trace bytes are not uploaded.
-- **Local CLI:** install `rlviz` for larger cohorts, growing files, private adapters, agent-readable queries, and named workspaces that a coding agent can update after the GUI opens.
+npm:
+
+```sh
+npm install --global rlviz
+```
+
+Verified shell installer:
+
+```sh
+curl -fsSL https://rlviz.dev/install.sh | sh
+```
+
+Then configure RLViz and open a trace:
+
+```sh
+rlviz init
+rlviz open ./path/to/trace.ndjson
+```
+
+The CLI adds persistent indexing, larger cohorts, private adapters, structured queries for coding agents, and named workspaces that an agent can update after the GUI opens.
+
+## What it does
+
+- Visualizes, navigates, filters, groups, and compares recorded trajectories.
+- Keeps source traces read-only. Browser parsing stays in the tab; CLI viewing stays on loopback.
+- Does not run agents, replay recorded tools, train models, manage prompts, or provide hosted monitoring.

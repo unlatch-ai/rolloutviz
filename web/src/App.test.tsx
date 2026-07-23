@@ -230,10 +230,12 @@ describe("instrument viewer", () => {
     expect(document.documentElement).toHaveAttribute("data-theme", "light");
   });
 
-  it("opens browser visitors directly to installation guidance", () => {
+  it("opens browser visitors on the overview with installation commands and data actions", () => {
     render(<App initialTrajectory={sampleTrajectory} setup={{ mode: "browser" }} />);
-    expect(screen.getByRole("button", { name: "Install" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("Install or open RLViz");
+    expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("Welcome to RLViz");
+    expect(screen.getByRole("article", { name: "RLViz guide" })).toHaveTextContent("brew install TheSnakeFang/tap/rlviz");
+    expect(screen.getByRole("button", { name: "Open trace directory" })).toBeInTheDocument();
   });
 
   it("restores the active rollout after closing Guide or Settings", async () => {
@@ -304,7 +306,7 @@ describe("instrument viewer", () => {
     const serialized = new URLSearchParams(window.location.search).get("workspace");
     expect(serialized).toBeTruthy();
     expect(JSON.parse(serialized!).layout).toBeUndefined();
-    expect(JSON.parse(window.localStorage.getItem("rlviz.workspace.v3")!).layout).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem("rlviz.workspace.v5")!).layout).toBeTruthy();
     first.unmount();
     render(<App initialTrajectory={sampleTrajectory} />);
     expect(await screen.findByRole("main", { name: "Read trajectory" })).toHaveAttribute("data-trajectory", sampleTrajectory.id);
@@ -431,7 +433,7 @@ describe("instrument viewer", () => {
     expect(document.querySelector(".instrument-shell")).toHaveAttribute("data-resize-mode", "false");
     const serialized = new URLSearchParams(window.location.search).get("workspace");
     expect(JSON.parse(serialized!).layout).toBeUndefined();
-    expect(JSON.parse(window.localStorage.getItem("rlviz.workspace.v3")!).layout).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem("rlviz.workspace.v5")!).layout).toBeTruthy();
     first.unmount();
     render(<App initialTrajectory={sampleTrajectory} />);
     expect(await screen.findByRole("region", { name: "Workspace console" })).toHaveAttribute("data-dock-position", "bottom");

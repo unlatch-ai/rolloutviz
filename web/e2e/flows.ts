@@ -340,13 +340,11 @@ export const flows: Flow[] = [
     ],
   },
   {
-    id: "s", name: "guide-shortcuts-switch-with-active-module", keyboardOnly: true, surfaces: ["daemon"], steps: [
-      { action: { kind: "key", value: "k" }, expect: [selectedRow("candidate")] },
-      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".guide-shortcuts", contains: "Increase fidelity" }] },
-      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".workspace-guide", absent: true }] },
-      { action: { kind: "key", value: "Enter" }, expect: [...depth(1), selectedEvent("Policy error")] },
-      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".guide-shortcuts", contains: "Next event" }] },
-      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".workspace-guide", absent: true }] },
+    id: "s", name: "keybar-shortcuts-switch-with-active-module", keyboardOnly: true, surfaces: ["daemon"], steps: [
+      { action: { kind: "key", value: "k" }, expect: [selectedRow("candidate"), { target: "rail", selector: ".keybar", contains: "Increase fidelity" }] },
+      { action: { kind: "key", value: "Enter" }, expect: [...depth(1), selectedEvent("Policy error"), { target: "rail", selector: ".keybar", contains: "Next event" }] },
+      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".workspace-guide" }, { target: "rail", selector: ".keybar", contains: "Toggle guide" }] },
+      { action: { kind: "key", value: "?" }, expect: [{ target: "rail", selector: ".workspace-guide", absent: true }, { target: "rail", selector: ".keybar", contains: "Next event" }] },
       { action: { kind: "key", value: "j" }, expect: [selectedEvent("Final reward")] },
     ],
   },

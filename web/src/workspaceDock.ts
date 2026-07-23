@@ -40,8 +40,9 @@ export function addDefaultPanel(
     return;
   }
   if (kind === "settings") {
-    const anchor = api.getPanel("guide") ?? api.getPanel("collection") ?? center;
-    api.addPanel({ id, component: "workspace", tabComponent: "minimal", renderer: "always", title: "Settings", params: { kind, label: "settings" }, initialWidth: Math.max(280, api.width * 0.28), ...(anchor ? { position: { referencePanel: anchor, direction: "right" as const } } : {}) });
+    const detail = api.getPanel("detail");
+    const anchor = detail ?? api.getPanel("guide") ?? api.getPanel("collection") ?? center;
+    api.addPanel({ id, component: "workspace", tabComponent: "minimal", renderer: "always", title: "Settings", params: { kind, label: "settings" }, initialWidth: Math.max(280, api.width * 0.28), initialHeight: Math.max(180, api.height * 0.34), ...(anchor ? { position: { referencePanel: anchor, direction: detail ? "below" as const : "right" as const } } : {}) });
     return;
   }
   if (kind === "detail") {

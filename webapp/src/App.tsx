@@ -47,6 +47,7 @@ export function BrowserApp() {
   const [help, setHelp] = useState(false);
   const [pendingAdapter, setPendingAdapter] = useState<PendingAdapter>();
   const traceInput = useRef<HTMLInputElement>(null);
+  const directoryInput = useRef<HTMLInputElement>(null);
   const adapterInput = useRef<HTMLInputElement>(null);
   const autoLoaded = useRef(false);
 
@@ -90,6 +91,17 @@ export function BrowserApp() {
     void openExample(cohortExample, "checkout-cohort.ndjson");
   }, []);
 
+  useEffect(() => { directoryInput.current?.setAttribute("webkitdirectory", ""); }, []);
+
+  const openDirectory = async (files?: FileList | null) => {
+    const candidates = [...(files ?? [])].filter((file) => !file.name.startsWith(".") && /\.(ndjson|json)$/i.test(file.name));
+    if (candidates.length !== 1) {
+      setStatus(`Choose a directory containing exactly one supported .ndjson or .json trace export; found ${candidates.length}.`);
+      return;
+    }
+    await openFile(candidates[0]);
+  };
+
   const chooseAdapter = async (file?: File) => {
     if (!file) return;
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -112,6 +124,7 @@ export function BrowserApp() {
 
   const picker = <>
     <input ref={traceInput} hidden type="file" onChange={(event) => void openFile(event.target.files?.[0])} />
+    <input ref={directoryInput} hidden type="file" multiple onChange={(event) => void openDirectory(event.target.files)} />
     <input ref={adapterInput} hidden type="file" accept=".wasm,application/wasm" onChange={(event) => void chooseAdapter(event.target.files?.[0])} />
   </>;
 
@@ -131,7 +144,7 @@ export function BrowserApp() {
       </section>
       <section className="privacy-proof" aria-label="Privacy guarantees"><div><b>zero upload</b><span>File and adapter APIs read local bytes directly.</span></div><div><b>in-memory index</b><span>No SQLite, account, cache, or server is involved.</span></div><div><b>static app</b><span>No CDN dependencies. Opened trace bytes never leave the tab.</span></div></section>
     </main> : <>
-      <Suspense fallback={<div className="viewer-loading" role="status">loading viewer…</div>}><Viewer provider={provider} setup={{ mode: "browser", status, samples: [...(activeSample ? [] : [{ label: "local trace", value: "" }]), ...examples.map(([label, value]) => ({ label, value }))], selectedSample: activeSample, onSample: (value) => { const sample = examples.find(([, name]) => name === value); if (sample) void openExample(sample[2], sample[1]); }, onOpenTrace: () => traceInput.current?.click(), onOpenAdapter: () => adapterInput.current?.click(), onAdapterHelp: () => setHelp(true) }} /></Suspense>
+      <Suspense fallback={<div className="viewer-loading" role="status">loading viewer…</div>}><Viewer provider={provider} setup={{ mode: "browser", status, samples: [...(activeSample ? [] : [{ label: "local trace", value: "" }]), ...examples.map(([label, value]) => ({ label, value }))], selectedSample: activeSample, onSample: (value) => { const sample = examples.find(([, name]) => name === value); if (sample) void openExample(sample[2], sample[1]); }, onOpenTrace: () => traceInput.current?.click(), onOpenDirectory: () => directoryInput.current?.click(), onOpenAdapter: () => adapterInput.current?.click(), onAdapterHelp: () => setHelp(true) }} /></Suspense>
     </>}
     {help && <div className="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="adapter-help-title"><section><header><h2 id="adapter-help-title">Ask your local coding agent</h2><button onClick={() => setHelp(false)}>close</button></header><p>This prompt defines the complete browser adapter contract. The app does not send it or your trace anywhere.</p><pre>{adapterPrompt}</pre><button onClick={() => void navigator.clipboard.writeText(adapterPrompt)}>copy prompt</button></section></div>}
     {pendingAdapter && <div className="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="adapter-confirm-title"><section><header><h2 id="adapter-confirm-title">Confirm browser adapter</h2><button onClick={() => setPendingAdapter(undefined)}>cancel</button></header><p>This module can compute inside the browser sandbox. It receives the current trace bytes and is not persisted.</p><dl><dt>module</dt><dd>{pendingAdapter.name}</dd><dt>size</dt><dd>{pendingAdapter.size.toLocaleString()} bytes</dd><dt>SHA-256</dt><dd><code>{pendingAdapter.digest}</code></dd></dl><button className="primary" disabled={!source} onClick={() => void confirmAdapter()}>{source ? "confirm and run once" : "open a trace first"}</button></section></div>}

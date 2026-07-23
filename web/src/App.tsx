@@ -13,7 +13,7 @@ import { preview, title } from "./format";
 import { sampleTrajectory } from "./sample";
 import { applyPresentationTheme } from "./presentation";
 import type { PresentationConfig } from "./types";
-import { effectiveDepth, laneId } from "./workspace";
+import { effectiveDepth, laneId, workspaceStorageKey } from "./workspace";
 import type { WorkspaceLane, WorkspaceState } from "./workspace";
 import { useWorkspaceController } from "./workspaceController";
 import { useLaneDataLoader } from "./laneLoader";
@@ -439,6 +439,15 @@ const dockTabComponents = { minimal: MinimalTab };
 const SHORTCUT_COLLECTION: CommandId[] = [commandIds.workspace.descend, commandIds.workspace.addLane, commandIds.view.fidelityUp, commandIds.group.search, commandIds.workspace.toggleRail, commandIds.workspace.toggleGuide, commandIds.workspace.toggleSettings, commandIds.workspace.cycleNext, commandIds.workspace.moveMode];
 const SHORTCUT_LANE: CommandId[] = [commandIds.trajectory.next, commandIds.trajectory.previous, commandIds.trajectory.nextError, commandIds.view.fidelityUp, commandIds.workspace.descend, commandIds.view.zoomIn, commandIds.workspace.openDetail, commandIds.workspace.toggleGuide, commandIds.workspace.toggleSettings, commandIds.workspace.moveMode, commandIds.workspace.cycleNext, commandIds.workspace.closeLane];
 const SHORTCUT_DETAIL: CommandId[] = [commandIds.trajectory.next, commandIds.trajectory.previous, commandIds.trajectory.nextError, commandIds.workspace.toggleGuide, commandIds.workspace.toggleSettings, commandIds.workspace.moveMode, commandIds.workspace.closeLane, commandIds.workspace.cycleNext];
+const SHORTCUT_GUIDE: CommandId[] = [commandIds.workspace.toggleGuide, commandIds.workspace.toggleSettings, commandIds.workspace.cycleNext, commandIds.workspace.cyclePrevious, commandIds.workspace.moveMode];
+const SHORTCUT_SETTINGS: CommandId[] = [commandIds.workspace.toggleSettings, commandIds.workspace.toggleGuide, commandIds.workspace.cycleNext, commandIds.workspace.cyclePrevious, commandIds.workspace.moveMode];
+
+function KeyBar({ shortcuts, selection, mode, onModeArrow, onModeExit }: { shortcuts: Array<{ binding: string; label: string; id?: CommandId }>; selection?: string; mode?: "move" | "resize"; onModeArrow: (key: string) => void; onModeExit: () => void }) {
+  return <footer className="keybar" role="region" aria-label="Active module shortcuts">
+    {mode ? <>{["ArrowLeft", "ArrowUp", "ArrowDown", "ArrowRight"].map((key) => <button key={key} className="keybar-chip" tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onClick={() => onModeArrow(key)}><kbd>{key.replace("Arrow", "")}</kbd><span>{mode === "move" ? "Move module" : "Resize seam"}</span></button>)}{shortcuts.slice(1).map((shortcut) => <button key={`${shortcut.binding}:${shortcut.label}`} className="keybar-chip" tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onClick={shortcut.label === "Cancel" ? onModeExit : () => dispatchCommand(mode === "move" ? commandIds.workspace.moveMode : commandIds.workspace.resizeMode)}><kbd>{shortcut.binding}</kbd><span>{shortcut.label}</span></button>)}</> : shortcuts.map((shortcut) => <button key={`${shortcut.binding}:${shortcut.label}`} className="keybar-chip" tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onClick={() => shortcut.id && dispatchCommand(shortcut.id)}><kbd>{shortcut.binding}</kbd><span>{shortcut.label}</span></button>)}
+    {selection && <span className="selection-address">{selection}</span>}
+  </footer>;
+}
 
 export function App({ initialTrajectory, provider = daemonProvider, setup = { mode: "cli" } }: { initialTrajectory?: Trajectory; provider?: ViewerProvider; setup?: ViewerSetup }) {
   useKeymapRevision();
@@ -453,7 +462,8 @@ export function App({ initialTrajectory, provider = daemonProvider, setup = { mo
   const lastFocus = useRef<string | undefined>(undefined);
   const lastGuideTarget = useRef("rail");
   const lastSettingsTarget = useRef("rail");
-  const lastShortcutModule = useRef<"collection" | "lane" | "detail">("collection");
+  const shouldOpenBrowserWelcome = useRef(setup.mode === "browser" && !new URLSearchParams(window.location.search).has("workspace") && !window.localStorage.getItem(workspaceStorageKey));
+  const browserWelcomeOpened = useRef(false);
   const legacyReadIntent = useRef((() => { const params = new URLSearchParams(window.location.search); return (params.get("mode") === "read" || params.get("view") === "read") && !params.get("trajectory_id"); })());
 
   const { laneData, laneDataRef, putLaneData, deleteLaneData, pruneOffLaneData, loadForSlot, loadAnalysisForLane } = useLaneDataLoader({
@@ -476,6 +486,7 @@ export function App({ initialTrajectory, provider = daemonProvider, setup = { mo
     onReady: onDockReady,
     persistLayout: persistDockLayout,
     arrangeLanes,
+    arrangeWelcomeLayout,
     moveActiveModule,
     resizeNearest,
     activateTarget,
@@ -552,6 +563,16 @@ export function App({ initialTrajectory, provider = daemonProvider, setup = { mo
   }, [change, loadAnalysisForLane, loadForSlot, pruneOffLaneData, putLaneData, workspaceRef]);
 
   const openSelected = (add: boolean) => { if (selectedRow) void loadRowIntoLane(selectedRow, add).catch((reason) => setError(reason instanceof Error ? reason.message : "Could not load trajectory")); };
+  useEffect(() => {
+    if (!shouldOpenBrowserWelcome.current || browserWelcomeOpened.current || ordered.length < 2) return;
+    browserWelcomeOpened.current = true;
+    void (async () => {
+      await loadRowIntoLane(ordered[0], true);
+      await loadRowIntoLane(ordered[1], true);
+      change((current) => ({ ...current, active: "guide", guideOpen: true, settingsOpen: true }), false);
+      arrangeWelcomeLayout();
+    })().catch((reason) => setError(reason instanceof Error ? reason.message : "Could not open example workspace"));
+  }, [arrangeWelcomeLayout, change, loadRowIntoLane, ordered]);
   const updateLane = useCallback((id: string, update: (lane: WorkspaceLane, data?: LaneData) => WorkspaceLane, snapshot = true) => change((current) => ({ ...current, lanes: current.lanes.map((lane) => lane.id === id ? update(lane, laneDataRef.current.get(id)) : lane) }), snapshot), [change]);
   const selectEvent = useCallback((id: string, index: number) => updateLane(id, (lane, data) => {
     if (!data) return { ...lane, selected: index };
@@ -667,25 +688,21 @@ export function App({ initialTrajectory, provider = daemonProvider, setup = { mo
     [commandIds.trajectory.nextReward]: () => jumpEvent((event) => event.kind === "reward" || event.kind === "grader"), [commandIds.trajectory.nextFinding]: () => { if (!activeLane) return false; const ids = new Set((laneData.get(activeLane.id)?.analysis?.analysis.findings ?? []).flatMap((finding) => finding.event_ids ?? [])); jumpEvent((event) => ids.has(event.id)); },
   });
 
-  useEffect(() => {
-    if (workspace.active === "rail") lastShortcutModule.current = "collection";
-    else if (workspace.active === "detail" || pinnedDetailLaneId(workspace.active)) lastShortcutModule.current = "detail";
-    else if (workspace.active !== "guide" && workspace.active !== "settings") lastShortcutModule.current = "lane";
-  }, [workspace.active]);
-  const shortcutIDs = moveMode || resizeMode ? [] : lastShortcutModule.current === "collection" ? SHORTCUT_COLLECTION : lastShortcutModule.current === "detail" ? SHORTCUT_DETAIL : SHORTCUT_LANE;
-  const shortcuts = moveMode || resizeMode
+  const shortcutIDs = moveMode || resizeMode ? [] : workspace.active === "rail" ? SHORTCUT_COLLECTION : workspace.active === "guide" ? SHORTCUT_GUIDE : workspace.active === "settings" ? SHORTCUT_SETTINGS : workspace.active === "detail" || pinnedDetailLaneId(workspace.active) ? SHORTCUT_DETAIL : SHORTCUT_LANE;
+  const shortcuts: Array<{ binding: string; label: string; id?: CommandId }> = moveMode || resizeMode
     ? [{ binding: "← ↑ ↓ →", label: `${moveMode ? "Move module" : "Resize seam"}` }, { binding: firstBindingLabel(moveMode ? commandIds.workspace.moveMode : commandIds.workspace.resizeMode), label: `Exit ${moveMode ? "move" : "resize"} mode` }, { binding: "Esc", label: "Cancel" }]
-    : shortcutIDs.map((id) => ({ binding: firstBindingLabel(id), label: commandDefinition(id).label }));
+    : shortcutIDs.map((id) => ({ binding: firstBindingLabel(id), label: commandDefinition(id).label, id }));
 
   const dockContent: DockContent = {
     collection: <Rail root={railRef} rows={filtered} workspace={{ ...workspace, railSelected: boundedRail }} fidelity={railFidelity} metadata={viewerMetadata.collections[collectionKey]} trajectoryMetadata={viewerMetadata.trajectories} onMetadata={(value) => updateCollection(collectionKey, value)} onActivate={() => { if (canActivateContent("rail")) change((current) => ({ ...current, active: "rail" })); }} onSelect={(index) => change((current) => ({ ...current, railSelected: index, active: "rail" }))} onOpen={() => openSelected(false)} onAdd={() => openSelected(true)} onCollectionView={(collectionView) => change((current) => ({ ...current, collectionView }))} onQuery={(railQuery) => change((current) => { const next = ordered.filter((row) => !railQuery || rowSearchText(row, viewerMetadata.trajectories[rowKey(row)]).includes(railQuery.toLowerCase())); const kept = selectedRow ? next.findIndex((row) => rowKey(row) === rowKey(selectedRow)) : -1; return { ...current, railQuery, railSelected: kept >= 0 ? kept : 0 }; })} />,
-    guide: <Guide active={workspace.active === "guide"} mode={setup.mode} shortcuts={shortcuts} onActivate={() => { if (canActivateContent("guide")) change((current) => ({ ...current, active: "guide" })); }} onClose={() => change((current) => ({ ...current, guideOpen: false, active: current.active === "guide" ? lastGuideTarget.current : current.active }))} />,
+    guide: <Guide active={workspace.active === "guide"} setup={setup} onActivate={() => { if (canActivateContent("guide")) change((current) => ({ ...current, active: "guide" })); }} onClose={() => change((current) => ({ ...current, guideOpen: false, active: current.active === "guide" ? lastGuideTarget.current : current.active }))} />,
     settings: <Settings active={workspace.active === "settings"} theme={theme} setup={setup} onTheme={setTheme} onActivate={() => { if (canActivateContent("settings")) change((current) => ({ ...current, active: "settings" })); }} onClose={() => change((current) => ({ ...current, settingsOpen: false, active: current.active === "settings" ? lastSettingsTarget.current : current.active }))} />,
     lane: (id) => { const lane = workspace.lanes.find((item) => item.id === id); return lane ? <LaneTrack lane={lane} data={laneData.get(lane.id)} metadata={viewerMetadata.trajectories[lane.id]} active={workspace.active === lane.id} reference={workspace.reference === lane.id} hover={hover[lane.id]} onActivate={() => { if (canActivateContent(lane.id)) change((current) => ({ ...current, active: lane.id })); }} onSelect={(value) => selectEvent(lane.id, value)} onHover={(value) => setHover((current) => ({ ...current, [lane.id]: value }))} onDescend={(episode) => descendLane(lane.id, episode)} onAscend={() => ascendLane(lane.id)} onAxisChange={(axis) => updateLane(lane.id, (current) => ({ ...current, axis }), false)} /> : null; },
-    detail: (id) => { const lane = id ? workspace.lanes.find((item) => item.id === id) : activeLane; const target = id ? pinnedDetailTarget(id) : "detail"; return <Console workspace={workspace} lane={lane} data={lane ? laneData.get(lane.id) : undefined} metadata={lane ? viewerMetadata.trajectories[lane.id] : undefined} breadcrumb={id && lane ? `${lane.trajectoryId} · detail` : breadcrumb} resizeMode={resizeMode} dockPosition={detailPosition} pinned={!!id} active={workspace.active === target} onMetadata={(value) => lane && updateTrajectory(lane.id, value)} onSelect={(index) => lane && selectEvent(lane.id, index)} onHelp={() => dispatchCommand(commandIds.workspace.toggleGuide)} onActivate={() => { if (canActivateContent(target)) change((current) => ({ ...current, active: target })); }} />; },
+    detail: (id) => { const lane = id ? workspace.lanes.find((item) => item.id === id) : activeLane ?? workspace.lanes.find((item) => item.id === lastFocus.current) ?? workspace.lanes.find((item) => item.band === "focus"); const target = id ? pinnedDetailTarget(id) : "detail"; return <Console workspace={workspace} lane={lane} data={lane ? laneData.get(lane.id) : undefined} metadata={lane ? viewerMetadata.trajectories[lane.id] : undefined} breadcrumb={id && lane ? `${lane.trajectoryId} · detail` : breadcrumb} resizeMode={resizeMode} dockPosition={detailPosition} pinned={!!id} active={workspace.active === target} onMetadata={(value) => lane && updateTrajectory(lane.id, value)} onSelect={(index) => lane && selectEvent(lane.id, index)} onHelp={() => dispatchCommand(commandIds.workspace.toggleGuide)} onActivate={() => { if (canActivateContent(target)) change((current) => ({ ...current, active: target })); }} />; },
   };
   return <ViewerProviderContext.Provider value={provider}><DockContentContext.Provider value={dockContent}><div className={`instrument-shell workspace-rack rail-${workspace.railExpanded ? "open" : "closed"}`} data-filter={workspace.railQuery} data-direction={workspace.direction} data-active-zone={workspace.active} data-move-mode={moveMode ? "true" : "false"} data-resize-mode={resizeMode ? "true" : "false"}>
     {error && <div className="instrument-error" role="alert">{error}</div>}{presentation?.notices?.map((notice) => <div className="presentation-notice" role="status" key={notice}>{notice}</div>)}
     <section className="workspace-stage" aria-label="Trajectory stage"><DockviewReact className="rlviz-dockview" components={dockComponents} tabComponents={dockTabComponents} defaultTabComponent={MinimalTab} onReady={onDockReady} disableFloatingGroups noPanelsOverlay="emptyGroup" keyboardNavigation={false} announcements={false} /></section>
+    <KeyBar shortcuts={shortcuts} mode={moveMode ? "move" : resizeMode ? "resize" : undefined} onModeArrow={(key) => moveMode ? moveActiveModule(key) : resizeNearest(key)} onModeExit={() => { setMoveMode(false); setResizeMode(false); }} selection={activeLane && laneData.get(activeLane.id)?.trajectory.events[activeLane.selected] ? `#${laneData.get(activeLane.id)!.trajectory.events[Math.min(activeLane.selected, laneData.get(activeLane.id)!.trajectory.events.length - 1)].sequence}` : undefined} />
   </div></DockContentContext.Provider></ViewerProviderContext.Provider>;
 }

@@ -158,7 +158,7 @@ kbd { border: 1px solid var(--hairline); border-bottom-width: 2px; border-radius
 
 /* Workspace v3: Dockview owns every module allocation. Lane depth, collection
    fidelity, and axis zoom never participate in panel sizing. */
-.workspace-rack { height: 100vh; min-height: 620px; display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; scrollbar-color: color-mix(in srgb, var(--ink) 34%, transparent) transparent; scrollbar-width: thin; }
+.workspace-rack { height: 100vh; min-height: 620px; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; scrollbar-color: color-mix(in srgb, var(--ink) 34%, transparent) transparent; scrollbar-width: thin; }
 .workspace-rack *::-webkit-scrollbar { width: 8px; height: 8px; }
 .workspace-rack *::-webkit-scrollbar-track { background: transparent; }
 .workspace-rack *::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: color-mix(in srgb, var(--ink) 34%, transparent); background-clip: padding-box; }
@@ -247,10 +247,9 @@ kbd { border: 1px solid var(--hairline); border-bottom-width: 2px; border-radius
 .guide-copy pre { max-width: 76ch; overflow: auto; padding: 10px; border: 1px solid var(--hairline); background: var(--page); font-size: 11px; }
 .guide-item { max-width: 76ch; display: grid; grid-template-columns: 12px 1fr; gap: 5px; }
 .guide-item > span { color: var(--muted); line-height: 1.55; }
-.guide-shortcuts { padding: 0 0 14px; border-bottom: 1px solid var(--hairline); }
-.guide-shortcuts h2 { margin-top: 0; border-top: 0; }
-.guide-shortcuts > div { display: flex; flex-wrap: wrap; gap: 6px; }
-.guide-shortcuts span { display: inline-flex; gap: 6px; align-items: center; padding: 4px 7px; border: 1px solid var(--hairline); border-radius: 4px; color: var(--ink-secondary); font-size: 11px; }
+.guide-actions { margin: 0 0 20px; padding: 0 0 18px; border-bottom: 1px solid var(--hairline); }
+.guide-actions button { margin: 0 6px 8px 0; padding: 8px 11px; }
+.guide-actions p { margin-top: 2px; }
 .workspace-settings { width: 100%; height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; outline: none; background: var(--surface); }
 .workspace-settings > header { min-height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; border-bottom: 1px solid var(--hairline); color: var(--ink-secondary); font-size: 11px; }
 .settings-copy { flex: 1; overflow: auto; padding: 14px; }
@@ -309,6 +308,11 @@ kbd { border: 1px solid var(--hairline); border-bottom-width: 2px; border-radius
 .axis-navigator input[type="range"] { position: absolute; z-index: 2; inset: 6px 8px; width: calc(100% - 16px); height: 22px; margin: 0; pointer-events: none; opacity: 0; }
 .axis-navigator input[type="range"]::-webkit-slider-thumb { pointer-events: auto; width: 14px; height: 26px; cursor: ew-resize; }
 .axis-navigator input[type="range"]::-moz-range-thumb { pointer-events: auto; width: 14px; height: 26px; cursor: ew-resize; }
+.keybar { min-width: 0; min-height: 35px; display: flex; gap: 2px; align-items: center; padding: 5px 10px; border-top: 1px solid var(--hairline); background: var(--surface); overflow-x: auto; }
+.keybar-chip { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 7px; border: 0; background: none; color: var(--ink-secondary); font-size: 11px; white-space: nowrap; }
+.keybar-chip:hover { color: var(--ink); background: var(--page); }
+.keybar-chip kbd { color: var(--ink); }
+.keybar .selection-address { margin-left: auto; padding-inline: 8px; color: var(--muted); white-space: nowrap; }
 .virtual-list { position: relative; }.virtual-row { position: absolute; top: 0; left: 0; right: 0; }
 @media (max-width: 900px) { .workspace-rack { min-width: 760px; }.console-header .judge-list { display: none; } }
 

@@ -10,7 +10,7 @@ import (
 //go:embed pages/*.md
 var files embed.FS
 
-var orderedPages = []string{"overview", "install", "workspace", "formats", "agents", "privacy"}
+var orderedPages = []string{"overview", "install", "workspace", "shortcuts", "formats", "agents", "privacy"}
 
 // Markdown is the complete version-matched documentation for CLI and agents.
 var Markdown = func() string {
