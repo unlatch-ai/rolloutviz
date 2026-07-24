@@ -14,15 +14,34 @@ record.
 
 The smallest examples are under `fixtures/canonical/`.
 
-The static browser viewer also includes pure-Go in-browser mappings for the
-documented JSON shapes below:
+The CLI and static browser viewer also include pure-Go mappings for these
+documented JSON shapes:
 
+- Harbor Agent Trajectory Interchange Format (ATIF) v1.5-v1.7
 - Inspect AI EvalLog JSON version 2 (not `.eval` archives)
 - Prime Intellect Verifiers GenerateOutputs JSON
 
-Those mappings compile into the local Go WASM core. The CLI versions remain
-reference process adapters until promoted separately; this distinction is
-reported literally by each surface.
+Those mappings compile into both the native binary and local Go WASM core.
+
+### Harbor ATIF JSON
+
+RLViz directly recognizes the public [Harbor Agent Trajectory Interchange
+Format](https://github.com/harbor-framework/harbor/blob/main/rfcs/0001-trajectory-format.md)
+versions 1.5 through 1.7. It maps messages, reasoning, tool calls and correlated
+observations, metrics, multimodal image references, and v1.7 embedded subagents.
+External `trajectory_path` and continuation references are preserved but never
+followed automatically.
+
+The reader accepts the RFC's one-based step IDs and historical Harbor v1.5-v1.6
+exports that begin at zero. Negative IDs remain invalid.
+
+This support is deliberately limited to an ATIF trajectory document. Harbor
+job directories, evaluator outputs, rewards stored beside the trajectory, and
+organization-specific metadata require a local adapter. No private schema or
+customer fixture is part of the built-in mapping.
+
+The browser retains its 32 MiB per-source ceiling. The local CLI is the intended
+path for longer trajectories and persistent indexes.
 
 ## Example adapter
 
@@ -34,19 +53,21 @@ or trusted built-in support.
 
 ### Inspect AI EvalLog JSON
 
-`examples/adapters/inspect-ai` maps the documented JSON `EvalLog` shape,
+`examples/adapters/inspect-ai` remains as readable reference code for the same
+built-in documented JSON `EvalLog` shape,
 including model, tool, score, and compaction events. It intentionally does not
 claim support for the compressed `.eval` container.
 
 ### Prime Intellect Verifiers GenerateOutputs JSON
 
-`examples/adapters/verifiers` maps the JSON-compatible `GenerateOutputs`
+`examples/adapters/verifiers` remains as readable reference code for the same
+built-in JSON-compatible `GenerateOutputs`
 contract, including rollout steps, rewards, metrics, token masks, and explicit
 generation truncation flags.
 
-These are dependency-free reference adapters backed by synthetic,
-contract-shaped fixtures. They are not automatically discovered or trusted
-built-in support.
+These executable examples are dependency-free and backed by synthetic,
+contract-shaped fixtures. The Simple JSONL example is not built in; Inspect and
+Verifiers are built in but keep examples to document the adapter contract.
 
 ## Project-local and user adapters
 

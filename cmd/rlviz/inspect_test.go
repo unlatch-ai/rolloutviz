@@ -52,6 +52,38 @@ func TestInspectCanonicalReturnsStableSupportedResult(t *testing.T) {
 	}
 }
 
+func TestInspectHarborATIFBuiltIn(t *testing.T) {
+	path := filepath.Join("..", "..", "examples", "traces", "harbor-atif.json")
+	result, err := inspectSource(context.Background(), path, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Supported || result.Format != "harbor-atif-json" || result.Confidence != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	if result.Adapter == nil || result.Adapter.Kind != "built_in" || result.Adapter.Name != "harbor-atif-json" || result.Adapter.Version != "ATIF-v1.7" {
+		t.Fatalf("adapter = %#v", result.Adapter)
+	}
+}
+
+func TestInspectDocumentJSONBuiltIns(t *testing.T) {
+	for _, test := range []struct{ path, format string }{
+		{"inspect-ai-eval.json", "inspect-ai-eval-log-json-v2"},
+		{"verifiers-generate.json", "prime-verifiers-generate-outputs"},
+	} {
+		t.Run(test.path, func(t *testing.T) {
+			path := filepath.Join("..", "..", "examples", "traces", test.path)
+			result, err := inspectSource(context.Background(), path, "", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !result.Supported || result.Format != test.format || result.Adapter == nil || result.Adapter.Kind != "built_in" {
+				t.Fatalf("result = %#v", result)
+			}
+		})
+	}
+}
+
 func TestInspectCanonicalUnsupportedIsSuccessful(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "unknown.json")
 	if err := os.WriteFile(source, []byte("{not json}\n"), 0o600); err != nil {

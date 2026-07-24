@@ -32,10 +32,12 @@ work, and `later` is an intended capability without a committed release.
 ### Local data and formats
 
 - `current` Canonical run, case, rollout-group, trajectory, event, signal, and artifact model.
-- `current` Built-in format detection plus process-isolated adapters and analyzers.
+- `current` Built-in canonical NDJSON, Harbor ATIF v1.5-v1.7, Inspect AI EvalLog JSON, and Verifiers GenerateOutputs detection plus process-isolated adapters and analyzers.
 - `current` Source provenance down to line, byte range, or original raw record.
 - `current` Read-only source handling, removable caches, loopback binding, and no outbound requests during normal viewing.
 - `current` Progressive indexing and updates for growing local files.
+- `current` Direct adapter-to-SQLite streaming with transactional rollback; canonical payloads are not materialized as a second temporary file.
+- `current` Bounded 1,000-event local pages so typical long rollouts open in one request while raw-byte ceilings still cap payload size.
 - `next` Clear first-run format diagnostics and an in-product adapter handoff.
 
 ### Collections and triage

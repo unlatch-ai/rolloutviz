@@ -38,7 +38,7 @@ concise guide available as a workspace module in the viewer.
 
 ## What it does
 
-- Opens canonical NDJSON, Inspect AI EvalLog JSON, Verifiers GenerateOutputs
+- Opens canonical NDJSON, Harbor ATIF v1.5-v1.7, Inspect AI EvalLog JSON, and Verifiers GenerateOutputs
   JSON, and explicitly trusted adapter output.
 - Browses one trajectory or a collection with truthful event positions,
   adjustable fidelity and depth, trial grouping, landmarks, and a draggable

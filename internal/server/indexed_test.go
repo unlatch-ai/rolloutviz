@@ -398,7 +398,7 @@ func TestIndexedEventsContextFilter(t *testing.T) {
 func TestIndexedQueryValidationIsStrict(t *testing.T) {
 	handler := testIndexedHandler(t)
 	tests := []string{
-		"/api/v1/indexed/events?trajectory=source-group&limit=201",
+		"/api/v1/indexed/events?trajectory=source-group&limit=1001",
 		"/api/v1/indexed/events?trajectory=source-group&after_sequence=-1",
 		"/api/v1/indexed/events?trajectory=source-group&unknown=x",
 		"/api/v1/indexed/events?trajectory=source-group&trajectory=other",

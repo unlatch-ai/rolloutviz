@@ -1,13 +1,17 @@
 package app
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/TheSnakeFang/rlviz/internal/atif"
+	"github.com/TheSnakeFang/rlviz/internal/browsercore"
 	rolloutindex "github.com/TheSnakeFang/rlviz/internal/index"
 	"github.com/TheSnakeFang/rlviz/internal/model"
 	"github.com/TheSnakeFang/rlviz/internal/plugins"
@@ -35,6 +39,39 @@ func IndexSource(ctx context.Context, store *rolloutindex.Index, path, adapterPa
 	}
 
 	if adapterPath == "" {
+		format, err := detectBuiltInFormat(resolved)
+		if err != nil {
+			return IndexedSource{}, err
+		}
+		if format != "canonical-ndjson" {
+			source := rolloutindex.Source{
+				ID: server.SourceID(resolved + "\x00builtin:" + format), Path: resolved,
+				Fingerprint: format + ":" + plugins.APIVersion, Size: info.Size(), ModTime: info.ModTime(),
+			}
+			if cached, ok, err := freshSource(ctx, store, source); err != nil {
+				return IndexedSource{}, err
+			} else if ok {
+				return IndexedSource{Info: cached}, nil
+			}
+			data, err := os.ReadFile(resolved)
+			if err != nil {
+				return IndexedSource{}, fmt.Errorf("read %s source: %w", format, err)
+			}
+			var canonical []byte
+			if format == atif.Format {
+				canonical, err = atif.NormalizeBytes(data, resolved)
+			} else {
+				canonical, _, err = browsercore.Normalize(data, resolved)
+			}
+			if err != nil {
+				return IndexedSource{}, &UnsupportedFormatError{Path: resolved, Cause: err}
+			}
+			indexed, err := store.Replace(ctx, source, bytes.NewReader(canonical))
+			if err != nil {
+				return IndexedSource{}, fmt.Errorf("index %s source: %w", format, err)
+			}
+			return IndexedSource{Info: indexed, Refreshed: true}, nil
+		}
 		source := rolloutindex.Source{
 			ID: server.SourceID(resolved + "\x00builtin:canonical"), Path: resolved,
 			Fingerprint: "canonical:" + plugins.APIVersion, Size: info.Size(), ModTime: info.ModTime(),
@@ -89,41 +126,48 @@ func IndexSource(ctx context.Context, store *rolloutindex.Index, path, adapterPa
 		return IndexedSource{Info: cached}, nil
 	}
 
-	temporary, err := os.CreateTemp("", "rlviz-adapter-stream-*.ndjson")
-	if err != nil {
-		return IndexedSource{}, err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	defer temporary.Close()
-	if err := temporary.Chmod(0o600); err != nil {
-		return IndexedSource{}, err
-	}
-	writer := bufio.NewWriterSize(temporary, 64<<10)
 	streamRequest, err := plugins.NewRequest("stream", resolved, probeRequest.Source.Root)
 	if err != nil {
 		return IndexedSource{}, err
 	}
-	diagnostics, err = host.Stream(ctx, plugin, streamRequest, func(record *model.Record) error {
-		if _, err := writer.Write(record.Raw); err != nil {
-			return err
+	indexed, err := store.ReplaceRecords(ctx, source, func(yield func(*model.Record) error) error {
+		var streamErr error
+		diagnostics, streamErr = host.Stream(ctx, plugin, streamRequest, yield)
+		if streamErr == nil {
+			return nil
 		}
-		return writer.WriteByte('\n')
+		return withDiagnostics(streamErr, diagnostics)
 	})
 	if err != nil {
-		return IndexedSource{}, withDiagnostics(err, diagnostics)
-	}
-	if err := writer.Flush(); err != nil {
-		return IndexedSource{}, err
-	}
-	if _, err := temporary.Seek(0, io.SeekStart); err != nil {
-		return IndexedSource{}, err
-	}
-	indexed, err := store.Replace(ctx, source, temporary)
-	if err != nil {
-		return IndexedSource{}, fmt.Errorf("index adapter output: %w", err)
+		return IndexedSource{}, fmt.Errorf("stream and index adapter output: %w", err)
 	}
 	return IndexedSource{Info: indexed, Refreshed: true}, nil
+}
+
+func detectBuiltInFormat(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	supported, _, err := atif.Probe(io.LimitReader(file, 1<<20))
+	if err == nil && supported {
+		return atif.Format, nil
+	}
+	info, statErr := file.Stat()
+	if statErr == nil && info.Size() <= browsercore.MaxRecommendedBytes && strings.EqualFold(filepath.Ext(path), ".json") {
+		if _, seekErr := file.Seek(0, io.SeekStart); seekErr == nil {
+			data, readErr := io.ReadAll(file)
+			if readErr == nil {
+				if _, format, normalizeErr := browsercore.Normalize(data, path); normalizeErr == nil {
+					return format, nil
+				}
+			}
+		}
+	}
+	// A bounded probe can end inside a large field before the ATIF header. Such
+	// documents are not auto-detected; explicit adapters remain available.
+	return "canonical-ndjson", nil
 }
 
 func freshSource(ctx context.Context, store *rolloutindex.Index, source rolloutindex.Source) (rolloutindex.SourceInfo, bool, error) {

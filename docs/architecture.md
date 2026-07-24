@@ -57,6 +57,7 @@ project-local adapters; the browser remains the only trajectory renderer.
 | `web/dist` | Generated production UI embedded by `web/embed.go` |
 | `webapp` | Static browser entry point for `rlviz.dev`; reuses `web/src` through the provider boundary |
 | `internal/browsercore` | WASM-safe normalization, validation, in-memory browse/read data, analysis, and comparison |
+| `internal/atif` | Public Harbor ATIF v1.5-v1.7 detection and canonical mapping shared by native and WASM paths |
 | `schemas/v1alpha1` | Public canonical and plugin contracts |
 | `fixtures` | Canonical, malformed, adversarial, and protocol conformance data |
 | `examples` | Runnable adapters and deterministic public gallery traces |
@@ -72,8 +73,8 @@ project-local adapters; the browser remains the only trajectory renderer.
 one static deployment. The former `app.rlviz.dev` surface redirects to the same
 path on `rlviz.dev`. The root loads a bundled synthetic cohort into the viewer;
 Settings can replace it with a dropped or selected `File` in the current tab.
-A Go WASM core detects canonical NDJSON, Inspect AI EvalLog
-JSON, or Verifiers GenerateOutputs JSON, validates canonical records, and
+A Go WASM core detects canonical NDJSON, Harbor ATIF v1.5-v1.7, Inspect AI
+EvalLog JSON, or Verifiers GenerateOutputs JSON, validates canonical records, and
 builds an in-memory collection. The shared React instrument consumes a
 `ViewerProvider`; the CLI uses the daemon HTTP provider and the static app uses
 the in-memory provider. Viewer components are not forked.
@@ -138,8 +139,11 @@ manifest -> schema validation -> path and digest trust check
          -> validate every returned record
 ```
 
-Stdout is protocol-only. Stderr is captured for diagnostics. Any plugin edit
-changes the digest and invalidates trust.
+Stdout is protocol-only. Validated adapter records stream directly into a
+transactional SQLite replacement; failures roll back without replacing the
+last valid index or materializing a second complete canonical file. Stderr is
+captured for diagnostics. Any plugin edit changes the digest and invalidates
+trust.
 
 ### Profile an unsupported source
 

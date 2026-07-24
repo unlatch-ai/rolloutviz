@@ -14,6 +14,7 @@ The browser accepts files up to 32 MiB in these formats:
 - canonical RLViz NDJSON
 - Inspect AI EvalLog JSON
 - Verifiers GenerateOutputs JSON
+- Harbor ATIF JSON v1.5-v1.7
 
 Settings can reload any bundled example, open your own file, change theme, or
 load a reviewed browser adapter. The Guide opens to installation instructions

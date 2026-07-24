@@ -42,6 +42,50 @@ func TestIndexSourceCanonicalCachesWholeGroup(t *testing.T) {
 	}
 }
 
+func TestIndexSourceHarborATIFBuiltIn(t *testing.T) {
+	store, err := rolloutindex.Open(filepath.Join(t.TempDir(), "index.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	path := filepath.Join("..", "..", "examples", "traces", "harbor-atif.json")
+	indexed, err := IndexSource(context.Background(), store, path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !indexed.Refreshed || indexed.Info.ID == "" {
+		t.Fatalf("indexed = %#v", indexed)
+	}
+	trajectories, err := store.Trajectories(context.Background(), indexed.Info.ID)
+	if err != nil || len(trajectories) != 2 {
+		t.Fatalf("trajectories=%#v err=%v", trajectories, err)
+	}
+	page, err := store.Events(context.Background(), rolloutindex.EventQuery{SourceID: indexed.Info.ID, TrajectoryID: trajectories[0].Value.ID})
+	if err != nil || page.Total != 5 {
+		t.Fatalf("page=%#v err=%v", page, err)
+	}
+}
+
+func TestIndexSourceDocumentJSONBuiltIns(t *testing.T) {
+	for _, name := range []string{"inspect-ai-eval.json", "verifiers-generate.json"} {
+		t.Run(name, func(t *testing.T) {
+			store, err := rolloutindex.Open(filepath.Join(t.TempDir(), "index.sqlite"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			indexed, err := IndexSource(context.Background(), store, filepath.Join("..", "..", "examples", "traces", name), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			trajectories, err := store.Trajectories(context.Background(), indexed.Info.ID)
+			if err != nil || len(trajectories) == 0 {
+				t.Fatalf("trajectories=%#v err=%v", trajectories, err)
+			}
+		})
+	}
+}
+
 func TestIndexSourceAdapterRequiresTrustAndIndexes(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 is unavailable")

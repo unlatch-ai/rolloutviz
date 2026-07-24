@@ -3,6 +3,7 @@ package index
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,34 @@ func (i *Index) Replace(ctx context.Context, source Source, stream io.Reader) (S
 	if stream == nil {
 		return SourceInfo{}, errors.New("source stream is required")
 	}
+	decoder := model.NewDecoder(stream)
+	return i.replaceRecords(ctx, source, func(yield func(*model.Record) error) error {
+		for {
+			record, err := decoder.NextContext(ctx)
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("decode source: %w", err)
+			}
+			if err := yield(record); err != nil {
+				return err
+			}
+		}
+	})
+}
+
+// ReplaceRecords transactionally indexes an already-decoded record stream.
+// It lets trusted adapters feed validated output directly into SQLite without
+// first materializing a second complete canonical file on disk.
+func (i *Index) ReplaceRecords(ctx context.Context, source Source, stream func(func(*model.Record) error) error) (SourceInfo, error) {
+	if stream == nil {
+		return SourceInfo{}, errors.New("record stream is required")
+	}
+	return i.replaceRecords(ctx, source, stream)
+}
+
+func (i *Index) replaceRecords(ctx context.Context, source Source, stream func(func(*model.Record) error) error) (SourceInfo, error) {
 	tx, err := i.db.BeginTx(ctx, nil)
 	if err != nil {
 		return SourceInfo{}, fmt.Errorf("begin index replacement: %w", err)
@@ -37,30 +66,29 @@ func (i *Index) Replace(ctx context.Context, source Source, stream io.Reader) (S
 		return SourceInfo{}, fmt.Errorf("insert source metadata: %w", err)
 	}
 
-	decoder := model.NewDecoder(stream)
 	validator := model.NewValidator()
 	var ordinal int64
 	var complete *model.Complete
 	var completeRaw []byte
-	for {
-		record, decodeErr := decoder.NextContext(ctx)
-		if errors.Is(decodeErr, io.EOF) {
-			break
-		}
-		if decodeErr != nil {
-			return SourceInfo{}, fmt.Errorf("decode source: %w", decodeErr)
+	consumeErr := stream(func(record *model.Record) error {
+		if record == nil {
+			return errors.New("record stream yielded nil record")
 		}
 		ordinal++
 		if err := validator.Add(record); err != nil {
-			return SourceInfo{}, fmt.Errorf("line %d: %w", record.Line, err)
+			return fmt.Errorf("line %d: %w", record.Line, err)
 		}
 		if err := insertRecord(ctx, tx, source, ordinal, record.ByteOffset, record.ByteLength, record); err != nil {
-			return SourceInfo{}, fmt.Errorf("index line %d: %w", record.Line, err)
+			return fmt.Errorf("index line %d: %w", record.Line, err)
 		}
 		if value, ok := record.Value.(*model.Complete); ok {
 			complete = value
 			completeRaw = append([]byte(nil), record.Raw...)
 		}
+		return nil
+	})
+	if consumeErr != nil {
+		return SourceInfo{}, consumeErr
 	}
 	if err := validator.Finish(); err != nil {
 		return SourceInfo{}, fmt.Errorf("validate source: %w", err)
@@ -124,7 +152,7 @@ func insertRecord(ctx context.Context, tx *sql.Tx, source Source, ordinal, byteO
 			context_present,context_operation,context_input_tokens,context_input_tokens_before,context_capacity,context_provenance
 		) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, sourceID, v.ID,
 			v.TrajectoryID, v.Sequence, v.Kind, v.Timestamp, v.ParentID, v.BranchID, v.AlignmentKey, v.StateHash,
-			string(record.Raw), sourcePath, sourceLine, offset, length, record.Line, byteOffset, byteLength, []byte(record.Raw),
+			eventSearchText(v), sourcePath, sourceLine, offset, length, record.Line, byteOffset, byteLength, []byte(record.Raw),
 			contextPresent, contextOperation, contextInputTokens, contextInputTokensBefore, contextCapacity, contextProvenance)
 		return err
 	case *model.Signal:
@@ -140,6 +168,26 @@ func insertRecord(ctx context.Context, tx *sql.Tx, source Source, ordinal, byteO
 	default:
 		return fmt.Errorf("unsupported record value %T", v)
 	}
+}
+
+func eventSearchText(event *model.Event) string {
+	// Search the human-meaningful payload once. Excluding event.Raw avoids a
+	// second full copy of source-native payloads (which canonical raw already
+	// preserves) while retaining titles, tool names, arguments, output, and
+	// adapter metadata.
+	value := struct {
+		Kind         string         `json:"kind"`
+		AlignmentKey string         `json:"alignment_key,omitempty"`
+		Input        any            `json:"input,omitempty"`
+		Output       any            `json:"output,omitempty"`
+		Data         any            `json:"data,omitempty"`
+		Metadata     model.Metadata `json:"metadata,omitempty"`
+	}{event.Kind, event.AlignmentKey, event.Input, event.Output, event.Data, event.Metadata}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return event.Kind + " " + event.AlignmentKey
+	}
+	return string(encoded)
 }
 
 func ptrValue(value *int64) any {

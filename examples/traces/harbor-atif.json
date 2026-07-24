@@ -1,0 +1,82 @@
+{
+  "schema_version": "ATIF-v1.7",
+  "session_id": "synthetic-checkout-session",
+  "trajectory_id": "checkout-parent",
+  "agent": {
+    "name": "synthetic-checkout-agent",
+    "version": "1.0.0",
+    "model_name": "example-model"
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "timestamp": "2026-01-01T00:00:00Z",
+      "source": "user",
+      "message": "Complete checkout using the saved card."
+    },
+    {
+      "step_id": 2,
+      "timestamp": "2026-01-01T00:00:01Z",
+      "source": "agent",
+      "message": "I will inspect the cart before submitting.",
+      "reasoning_content": "Verify the total and saved payment method.",
+      "model_name": "example-model",
+      "tool_calls": [
+        {
+          "tool_call_id": "call-cart-1",
+          "function_name": "read_cart",
+          "arguments": {"cart_id": "cart-example"}
+        }
+      ],
+      "observation": {
+        "results": [
+          {
+            "source_call_id": "call-cart-1",
+            "content": "Cart total is 42.00 USD; saved card is available."
+          }
+        ]
+      },
+      "metrics": {
+        "prompt_tokens": 128,
+        "completion_tokens": 24
+      },
+      "llm_call_count": 1
+    },
+    {
+      "step_id": 3,
+      "timestamp": "2026-01-01T00:00:02Z",
+      "source": "agent",
+      "message": "Checkout completed.",
+      "tool_calls": [],
+      "metrics": {
+        "prompt_tokens": 166,
+        "completion_tokens": 9
+      }
+    }
+  ],
+  "final_metrics": {
+    "total_prompt_tokens": 294,
+    "total_completion_tokens": 33,
+    "total_cost_usd": 0.0012,
+    "total_steps": 3
+  },
+  "subagent_trajectories": [
+    {
+      "schema_version": "ATIF-v1.7",
+      "trajectory_id": "payment-check-subagent",
+      "agent": {
+        "name": "synthetic-payment-checker",
+        "version": "1.0.0"
+      },
+      "steps": [
+        {
+          "step_id": 1,
+          "source": "agent",
+          "message": "Saved payment method is valid.",
+          "tool_calls": []
+        }
+      ],
+      "final_metrics": {"total_steps": 1}
+    }
+  ]
+}

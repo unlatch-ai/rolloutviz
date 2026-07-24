@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/TheSnakeFang/rlviz/internal/atif"
 	"github.com/TheSnakeFang/rlviz/internal/model"
 	"github.com/TheSnakeFang/rlviz/internal/plugins"
 )
@@ -75,12 +76,22 @@ func runFormats(arguments []string) {
 }
 
 func collectFormats(entries []plugins.TrustEntry, discoveries ...plugins.DiscoveryResult) formatsResult {
-	formats := []formatInfo{{
-		ID: "canonical-ndjson", Name: "Canonical NDJSON", Source: "built_in",
-		Kind: "Adapter", APIVersion: model.APIVersion, Status: "available",
-		Capabilities: []string{"adapter.stream", "groups", "artifacts", "source-provenance"},
-		Description:  "Versioned newline-delimited RLViz canonical records",
-	}}
+	formats := []formatInfo{
+		{
+			ID: "canonical-ndjson", Name: "Canonical NDJSON", Source: "built_in",
+			Kind: "Adapter", APIVersion: model.APIVersion, Status: "available",
+			Capabilities: []string{"adapter.stream", "groups", "artifacts", "source-provenance"},
+			Description:  "Versioned newline-delimited RLViz canonical records",
+		},
+		{
+			ID: atif.Format, Name: "Harbor ATIF JSON", Source: "built_in",
+			Kind: "Adapter", APIVersion: model.APIVersion, Version: "ATIF-v1.5-v1.7", Status: "available",
+			Capabilities: []string{"adapter.probe", "adapter.stream", "subagents", "artifacts", "source-provenance"},
+			Description:  "Public Harbor Agent Trajectory Interchange Format",
+		},
+		{ID: "inspect-ai-eval-log-json-v2", Name: "Inspect AI EvalLog JSON v2", Source: "built_in", Kind: "Adapter", APIVersion: model.APIVersion, Version: "2", Status: "available", Capabilities: []string{"adapter.probe", "adapter.stream", "groups", "source-provenance"}, Description: "Inspect AI model, tool, score, and compaction events from EvalLog JSON"},
+		{ID: "prime-verifiers-generate-outputs", Name: "Prime Intellect Verifiers GenerateOutputs", Source: "built_in", Kind: "Adapter", APIVersion: model.APIVersion, Status: "available", Capabilities: []string{"adapter.probe", "adapter.stream", "groups", "source-provenance"}, Description: "Verifiers rollout steps, token masks, rewards, and metrics"},
+	}
 	knownPaths := map[string]int{}
 	for _, entry := range entries {
 		pathKey := cleanFormatPath(entry.Path)
@@ -136,8 +147,6 @@ func collectFormats(entries []plugins.TrustEntry, discoveries ...plugins.Discove
 func documentedExampleFormats() []formatInfo {
 	return []formatInfo{
 		{ID: "simple-agent-jsonl", Name: "Simple JSONL", Source: "example_adapter", Kind: "Adapter", APIVersion: model.APIVersion, Version: "0.1.0", Status: "example", Capabilities: []string{"adapter.probe", "adapter.stream"}, Description: "Small non-canonical JSONL reference adapter"},
-		{ID: "inspect-ai-eval-log-json-v2", Name: "Inspect AI EvalLog JSON v2", Source: "example_adapter", Kind: "Adapter", APIVersion: model.APIVersion, Version: "0.1.0", Status: "example", Capabilities: []string{"adapter.probe", "adapter.stream"}, Description: "Model, tool, score, and compaction events from EvalLog JSON"},
-		{ID: "prime-verifiers-generate-outputs", Name: "Prime Intellect Verifiers GenerateOutputs", Source: "example_adapter", Kind: "Adapter", APIVersion: model.APIVersion, Version: "0.1.0", Status: "example", Capabilities: []string{"adapter.probe", "adapter.stream"}, Description: "RL rollout steps, token masks, rewards, and metrics"},
 	}
 }
 

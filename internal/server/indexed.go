@@ -16,7 +16,7 @@ import (
 
 const (
 	DefaultIndexedPageLimit = 100
-	MaxIndexedPageLimit     = 200
+	MaxIndexedPageLimit     = 1000
 	MaxCompleteChildRecords = 1000
 	MaxTrajectoryRawBytes   = 64 << 20
 )

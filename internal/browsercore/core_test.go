@@ -20,6 +20,7 @@ func TestParseBuiltInBrowserFormats(t *testing.T) {
 		firstEvents  int
 	}{
 		{"../../examples/gallery/coding-agent-bugfix.ndjson", "canonical-ndjson", 1, 300},
+		{"../../examples/traces/harbor-atif.json", "harbor-atif-json", 2, 5},
 		{"../../examples/traces/inspect-ai-eval.json", "inspect-ai-eval-log-json-v2", 2, 5},
 		{"../../examples/traces/verifiers-generate.json", "prime-verifiers-generate-outputs", 1, 3},
 	}

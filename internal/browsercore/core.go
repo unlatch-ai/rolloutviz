@@ -20,6 +20,7 @@ import (
 
 	"github.com/TheSnakeFang/rlviz/internal/alignment"
 	"github.com/TheSnakeFang/rlviz/internal/analyzers"
+	"github.com/TheSnakeFang/rlviz/internal/atif"
 	"github.com/TheSnakeFang/rlviz/internal/model"
 	"github.com/TheSnakeFang/rlviz/internal/shape"
 )
@@ -105,7 +106,11 @@ func Normalize(source []byte, name string) ([]byte, string, error) {
 	}
 	var document map[string]any
 	if err := json.Unmarshal(trimmed, &document); err != nil {
-		return nil, "", errors.New("unsupported trace: expected canonical NDJSON, Inspect AI EvalLog JSON, or Verifiers GenerateOutputs JSON")
+		return nil, "", errors.New("unsupported trace: expected canonical NDJSON, Harbor ATIF JSON, Inspect AI EvalLog JSON, or Verifiers GenerateOutputs JSON")
+	}
+	if atif.Detect(document) {
+		out, err := atif.Normalize(document, name)
+		return out, atif.Format, err
 	}
 	if version, ok := number(document["version"]); ok && version == 2 && object(document["eval"]) != nil && array(document["samples"]) != nil {
 		out, err := normalizeInspect(document, name)
@@ -115,7 +120,7 @@ func Normalize(source []byte, name string) ([]byte, string, error) {
 		out, err := normalizeVerifiers(document, name, source)
 		return out, "prime-verifiers-generate-outputs", err
 	}
-	return nil, "", errors.New("unsupported trace: expected canonical NDJSON, Inspect AI EvalLog JSON, or Verifiers GenerateOutputs JSON")
+	return nil, "", errors.New("unsupported trace: expected canonical NDJSON, Harbor ATIF JSON, Inspect AI EvalLog JSON, or Verifiers GenerateOutputs JSON")
 }
 
 func ParseCanonical(canonical []byte, name, format string, sourceSize int) (Collection, error) {

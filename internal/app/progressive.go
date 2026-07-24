@@ -46,6 +46,17 @@ func (indexer *SourceIndexer) Index(ctx context.Context, path, adapterPath strin
 	if adapterPath != "" {
 		return IndexSource(ctx, indexer.store, path, adapterPath)
 	}
+	resolved, err := ValidateSource(path)
+	if err != nil {
+		return IndexedSource{}, err
+	}
+	format, err := detectBuiltInFormat(resolved)
+	if err != nil {
+		return IndexedSource{}, err
+	}
+	if format != "canonical-ndjson" {
+		return IndexSource(ctx, indexer.store, resolved, "")
+	}
 	source, err := canonicalSource(path)
 	if err != nil {
 		return IndexedSource{}, err

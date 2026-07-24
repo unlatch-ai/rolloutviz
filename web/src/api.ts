@@ -1,6 +1,8 @@
 import { sampleTrajectory } from "./sample";
 import type { AnalysisResponse, BrowseResponse, ComparisonResponse, EventPageResponse, GroupPathsResponse, GroupResponse, IndexedSource, PageMetadata, PresentationConfig, Trajectory, TrajectoryArtifact, TrajectoryEvent, TrajectoryResponse, TrajectorySignal } from "./types";
 
+const EVENT_PAGE_LIMIT = "1000";
+
 export interface LoadResult { trajectory: Trajectory; isSample: boolean; page?: PageMetadata; signalPage?: PageMetadata; artifactPage?: PageMetadata; source?: IndexedSource; presentation?: PresentationConfig; error?: string }
 
 export function completeEventPage(count: number): PageMetadata {
@@ -13,7 +15,7 @@ export function trajectoryEndpoint(search = globalThis.location?.search ?? ""): 
   params.delete("indexed");
   // Viewer state belongs in shareable URLs, but is not part of the daemon API.
   for (const key of ["demo", "event", "surface", "view", "mode", "left", "right", "step", "cohort_filter", "workspace", "workspace_id"]) params.delete(key);
-  if (indexed && !params.has("limit")) params.set("limit", "200");
+  if (indexed && !params.has("limit")) params.set("limit", EVENT_PAGE_LIMIT);
   const query = params.toString();
   return `${indexed ? "/api/v1/indexed/trajectory" : "/api/v1/trajectory"}${query ? `?${query}` : ""}`;
 }
@@ -127,7 +129,7 @@ export async function loadBrowse(signal?: AbortSignal): Promise<BrowseResponse> 
 }
 
 export async function loadIndexedTrajectory(sourceId: string, trajectoryId: string, signal?: AbortSignal): Promise<LoadResult> {
-  const params = new URLSearchParams({ trajectory: sourceId, trajectory_id: trajectoryId, limit: "200" });
+  const params = new URLSearchParams({ trajectory: sourceId, trajectory_id: trajectoryId, limit: EVENT_PAGE_LIMIT });
   const response = await fetch(`/api/v1/indexed/trajectory?${params}`, { signal, headers: requestHeaders() });
   clearTokenOnAuthFailure(response);
   if (!response.ok) throw new Error(`Trajectory API returned ${response.status}`);
@@ -161,7 +163,7 @@ export async function loadChildPage(kind: "signals" | "artifacts", sourceId: str
 }
 
 export async function loadEventPage(sourceId: string, trajectoryId: string, afterSequence: number, signal?: AbortSignal): Promise<EventPageResponse> {
-  const params = new URLSearchParams({ trajectory: sourceId, trajectory_id: trajectoryId, after_sequence: String(afterSequence), limit: "200" });
+  const params = new URLSearchParams({ trajectory: sourceId, trajectory_id: trajectoryId, after_sequence: String(afterSequence), limit: EVENT_PAGE_LIMIT });
   const response = await fetch(`/api/v1/indexed/events?${params}`, { signal, headers: requestHeaders() });
   if (!response.ok) throw new Error(`Event API returned ${response.status}`);
   const payload = (await response.json()) as EventPageResponse;
