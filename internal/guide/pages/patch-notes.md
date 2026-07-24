@@ -1,5 +1,12 @@
 # Patch notes
 
+## 0.3.4
+
+- Added built-in Harbor ATIF v1.5-v1.7, Inspect AI EvalLog v2, and Verifiers GenerateOutputs adapters across the CLI and browser viewer.
+- Preserved ATIF tool calls, results, metrics, attachments, and embedded subagent trajectories in RLViz's canonical event model.
+- Streamed trusted adapter output directly into transactional SQLite and paged local events in 1,000-event windows for long-running rollouts.
+- Reduced duplicate indexed payload data, cutting requests and memory use on large traces.
+
 ## 0.3.2
 
 - `Enter` now opens the selected rollout section in place and clears an unpinned Detail module out of the way.
