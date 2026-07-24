@@ -1,6 +1,6 @@
 # Patch notes
 
-## Next
+## 0.3.6
 
 - Added built-in Letta trajectory v1 JSON support for normalized Claude Code,
   Codex, Letta Code, and other harness sessions.
